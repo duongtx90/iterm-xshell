@@ -146,3 +146,7 @@ Phát hiện thêm khi chạy thật:
 - Panel Xftp đi theo thư mục terminal chỉ khi server có Shell Integration.
 - "Tự gõ mật khẩu" chỉ nhận dấu nhắc kiểu `password:` (không nhận OTP/2FA).
 - Mỗi lần iTerm2 khởi động, script AutoLaunch xin cookie qua AppleScript. Lần đầu macOS có thể hỏi quyền Automation.
+
+## License
+
+MIT © 2026 DuongTx — xem [LICENSE](LICENSE).
