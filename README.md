@@ -1,152 +1,156 @@
 # iterm-xshell
 
-Biến iTerm2 trên macOS thành trải nghiệm giống **Xshell + Xftp**:
+Turns iTerm2 on macOS into an **Xshell + Xftp**-like experience:
 
-- **Kênh SSH** (Session Manager): danh sách kênh đã lưu, gom theo nhóm, tự import từ `~/.ssh/config`. Click là mở SSH trong tab mới.
-- **Xftp**: duyệt file trên server mà tab hiện tại đang ssh tới. Hỗ trợ upload bằng kéo thả, tải về, tạo thư mục, đổi tên, xoá, xem nhanh, và `cd` terminal tới thư mục đang xem.
+- **SSH channels** (Session Manager): saved channels grouped into folders, automatically imported from `~/.ssh/config`. One click opens SSH in a new tab.
+- **Xftp**: browse files on the server the current tab is ssh'd into. Drag-and-drop upload, background downloads with progress, create folders, rename, delete, quick view, and `cd` the terminal to the folder you are looking at.
 
-Một daemon Python (iTerm2 Python API, AutoLaunch) chạy một web server aiohttp trên `127.0.0.1`, phục vụ hai panel HTML/JS thuần:
+A single Python daemon (iTerm2 Python API, AutoLaunch) runs an aiohttp web server on `127.0.0.1` that serves two plain HTML/JS panels:
 
-| Panel | Nằm ở đâu |
+| Panel | Where it lives |
 |---|---|
-| Kênh SSH | **Cửa sổ riêng dock sát mép trái** cửa sổ iTerm2 đang active, vì Toolbelt không đặt bên trái được (xem *Đã kiểm chứng*). Tuỳ chọn: thêm vào Toolbelt. |
-| Xftp | Tool `Xftp` trong Toolbelt (bên phải). |
+| SSH channels | **A separate window docked to the left edge** of the active iTerm2 window, because the Toolbelt cannot be placed on the left (see *Verified assumptions*). Optionally also added to the Toolbelt. |
+| Xftp | The `Xftp` tool in the Toolbelt (right side). |
 
-## Cài đặt
+## Install
+
+Download the `.dmg` (or `.tar.gz`) from the [Releases](https://github.com/duongtx90/iterm-xshell/releases) page and double-click `Cài đặt.command` (the installer; the name is Vietnamese for "Install"), or from a checkout:
 
 ```bash
-./install.sh            # cài/cập nhật rồi khởi động ngay, không cần khởi động lại iTerm2
+./install.sh            # install/update and start right away, no iTerm2 restart needed
 ./install.sh --help     # --python PATH, --no-start, --dev, --uninstall, --purge
 ```
 
-Cần có:
-- macOS và iTerm2 3.5 trở lên (đã thử trên 3.7.3), với **Settings > General > Magic > Enable Python API** đang bật.
-- Python 3.9 trở lên. install.sh tự tìm theo thứ tự: Homebrew, python.org, runtime Python của iTerm2, rồi `/usr/bin/python3` của Command Line Tools.
+The DMG is not signed or notarized; on first launch you may need to right-click > Open.
 
-install.sh sẽ:
-1. Tạo venv ở `~/Library/Application Support/iterm-xshell/venv` và cài `iterm2 aiohttp asyncssh pyobjc-framework-WebKit pyobjc-framework-Quartz`. Trên Apple Silicon luôn chạy với `arch -arm64`.
-2. Copy mã nguồn vào `~/Library/Application Support/iterm-xshell/app` và tạo `run.sh`. `run.sh` thay instance cũ nếu đang chạy.
-3. Biên dịch `~/Library/Application Support/iTerm2/Scripts/AutoLaunch/XshellPanels.scpt`. Mỗi lần iTerm2 khởi động, file này xin cookie Python API bằng `request cookie and key` rồi gọi `run.sh`.
+Requirements:
+- macOS and iTerm2 3.5 or later (tested on 3.7.3), with **Settings > General > Magic > Enable Python API** turned on.
+- Python 3.9 or later. install.sh looks for one in this order: Homebrew, python.org, iTerm2's Python runtime, then the Command Line Tools `/usr/bin/python3`.
 
-Muốn khởi động lại daemon thì chọn menu **Scripts > AutoLaunch > XshellPanels**, hoặc chạy lại `./install.sh`.
-Log nằm ở `~/Library/Logs/iterm-xshell.log` (app) và `~/Library/Logs/iterm-xshell.out` (stdout/stderr).
+install.sh does the following:
+1. Creates a venv at `~/Library/Application Support/iterm-xshell/venv` and installs `iterm2 aiohttp asyncssh pyobjc-framework-WebKit pyobjc-framework-Quartz`. On Apple Silicon it always runs under `arch -arm64`.
+2. Copies the source to `~/Library/Application Support/iterm-xshell/app` and creates `run.sh`. `run.sh` replaces any running instance.
+3. Compiles `~/Library/Application Support/iTerm2/Scripts/AutoLaunch/XshellPanels.scpt`. Every time iTerm2 starts, this file requests a Python API cookie with `request cookie and key` and then calls `run.sh`.
 
-Gỡ: `./install.sh --uninstall` giữ lại danh sách kênh, `--purge` xoá luôn.
+To restart the daemon, choose **Scripts > AutoLaunch > XshellPanels** from the menu, or re-run `./install.sh`.
+Logs are in `~/Library/Logs/iterm-xshell.log` (app) and `~/Library/Logs/iterm-xshell.out` (stdout/stderr).
 
-## Cách dùng
+Uninstall: `./install.sh --uninstall` keeps your channel list, `--purge` deletes it too.
 
-### Kênh SSH (cửa sổ bên trái)
+## Usage
 
-- Cửa sổ chỉ hiện khi iTerm2 đang ở trên cùng, và luôn bám sát mép trái cửa sổ iTerm2 đang active. Kéo cạnh phải để đổi độ rộng (lưu ở `~/.config/iterm-xshell/window.json`). Nếu bên trái không đủ chỗ (cửa sổ sát mép màn hình), cửa sổ iTerm2 được dịch sang phải một lần cho vừa.
-- Click vào panel **không** lấy focus khỏi iTerm2 (non-activating panel), nhưng vẫn gõ được vào ô tìm kiếm và form.
-- **Click** hoặc **Enter** mở kênh trong **tab mới**. **Shift+Enter** mở ở split dọc.
-- **Chuột phải** (hoặc phím Menu) mở menu: mở tab mới, split dọc, split ngang, tab hiện tại, chuyển tới tab đang mở, sửa, nhân bản, copy lệnh ssh, xoá.
-- Badge xanh `●` / `● 2` cho biết kênh đang mở trong 1 hoặc 2 tab.
-- Kênh import từ `~/.ssh/config` có biểu tượng ⚙ và nằm trong nhóm `~/.ssh/config` (đổi nhóm được). Nếu alias biến mất khỏi config thì kênh bị gạch ngang và không mở được, nhưng không bị tự xoá.
-- Nút ⟳ đồng bộ lại ngay. Ngoài ra daemon tự đồng bộ khi khởi động và khi `~/.ssh/config` hoặc file `Include` của nó thay đổi (kiểm tra mỗi 2 giây theo mtime/size).
-- Bấm × trên thanh tiêu đề để ẩn cửa sổ. Bật lại bằng phím tắt (xem dưới).
+### SSH channels (left window)
+
+- The window is only visible while iTerm2 is frontmost, and always hugs the left edge of the active iTerm2 window. Drag its right edge to resize (stored in `~/.config/iterm-xshell/window.json`). If there is not enough room on the left (the window is at the screen edge), the iTerm2 window is shifted right once to make space.
+- Clicking the panel does **not** steal focus from iTerm2 (non-activating panel), yet you can still type in the search box and forms.
+- **Click** or **Enter** opens the channel in a **new tab**. **Shift+Enter** opens it in a vertical split.
+- **Right-click** (or the Menu key) opens a menu: new tab, vertical split, horizontal split, current tab, switch to the open tab, edit, duplicate, copy ssh command, delete.
+- A green `●` / `● 2` badge shows that the channel is open in 1 or 2 tabs.
+- Channels imported from `~/.ssh/config` have a ⚙ icon and live in the `~/.ssh/config` group (you can change the group). If the alias disappears from the config, the channel is shown struck through and cannot be opened, but it is not deleted automatically.
+- The ⟳ button syncs immediately. The daemon also syncs on startup and whenever `~/.ssh/config` or one of its `Include` files changes (checked every 2 seconds by mtime/size).
+- Click × on the title bar to hide the window. Bring it back with a shortcut (see below).
 
 ### Xftp (Toolbelt)
 
-Bật bằng **View > Toolbelt > Show Toolbelt**, rồi tick **Xftp** trong **View > Toolbelt**.
+Enable it with **View > Toolbelt > Show Toolbelt**, then tick **Xftp** in **View > Toolbelt**.
 
-- Panel tự nhận host của tab hiện tại. Nếu tab được mở từ panel kênh SSH (có biến `user.xshellSessionId`), panel dùng đúng thông tin của kênh, kể cả `identity_file` và các `-o` trong tham số thêm. Nếu không, panel parse lệnh `ssh …` của tab rồi resolve bằng `ssh -G`.
-- **⇵ theo terminal**: khi server có [iTerm2 Shell Integration](https://iterm2.com/documentation-shell-integration.html), `cd` trong terminal thì panel đi theo. Nút **cd ↵** làm ngược lại: `cd` terminal tới thư mục panel đang xem.
-- Upload: kéo thả file **hoặc cả thư mục** vào danh sách, hoặc bấm ⤒. Có thanh tiến độ, nút **✕ Huỷ** (file dở dang bị xoá trên server) và xác nhận trước khi ghi đè.
-- **Tải về** lưu vào `~/Downloads`, cả thư mục cũng được. Trùng tên thì tự đổi thành `tên (1)`, xong thì mở Finder ở file vừa tải.
-- **Xem** (hoặc Space) xem nhanh 256 KB đầu của file text. File nhị phân bị từ chối.
-- ⇄ kết nối tay tới alias hoặc `user@host:port` bất kỳ. Để trống thì quay về chế độ theo terminal.
-- Server chỉ cho đăng nhập bằng mật khẩu thì panel hỏi mật khẩu. Mật khẩu chỉ giữ trong RAM, trừ khi kênh bật lưu Keychain.
+- The panel detects the host of the current tab. If the tab was opened from the SSH channels panel (it has the variable `user.xshellSessionId`), the panel uses that channel's exact settings, including `identity_file` and any `-o` options in the extra arguments. Otherwise it parses the tab's `ssh …` command and resolves it with `ssh -G`.
+- **⇵ follow terminal**: when the server has [iTerm2 Shell Integration](https://iterm2.com/documentation-shell-integration.html), `cd` in the terminal makes the panel follow. The **cd ↵** button does the reverse: it `cd`s the terminal to the folder the panel is showing.
+- Upload: drag files **or whole folders** into the list, or click ⤒. There is a progress bar, a **✕ Cancel** button (a partial file is removed from the server) and a confirmation before overwriting.
+- **Download** saves to `~/Downloads`; folders work too. Name clashes become `name (1)`, and Finder opens at the downloaded file when it finishes. Downloads **run in the background inside the daemon**: a "Downloads" strip under the file list shows percentage, size, speed, ETA and a Cancel button for each job. It survives switching chat sessions or reloading the panel, and warns when no data has arrived for 15 seconds. A cancelled or failed download deletes its partial file. The SFTP read window is enlarged (`block_size=-1`, 256 in-flight requests) to cope with high-latency links.
+- **View** (or Space) quick-views the first 256 KB of a text file. Binary files are rejected.
+- ⇄ connects manually to any alias or `user@host:port`. Leave it empty to go back to following the terminal.
+- If the server only allows password login, the panel asks for the password. Passwords are kept in RAM only, unless the channel has Keychain storage enabled.
 
-### Phím tắt
+### Shortcuts
 
-| Ở đâu | Phím | Việc |
+| Where | Key | Action |
 |---|---|---|
-| Kênh SSH | ⌘F | Focus ô tìm kiếm (tìm không cần dấu: `kho van` khớp "Kho vận") |
-| Kênh SSH | ↑ ↓, Enter, Shift+Enter | Chọn kênh, mở tab mới, mở split dọc |
-| Kênh SSH | ⌘N | Thêm kênh |
-| Kênh SSH | ⌫ | Xoá kênh (có xác nhận) |
-| Kênh SSH | Esc | Xoá ô tìm kiếm, đóng menu/form |
-| Xftp | ⌘↑ / Enter | Lên thư mục cha / vào thư mục |
-| Xftp | ⌘A, ⌘-click, Shift-click | Chọn nhiều |
-| Xftp | Space | Xem nhanh |
-| Xftp | ⌫ | Xoá (có xác nhận) |
-| Xftp | ⌘L | Nhập đường dẫn |
+| SSH channels | ⌘F | Focus the search box (accent-insensitive: `kho van` matches "Kho vận") |
+| SSH channels | ↑ ↓, Enter, Shift+Enter | Select a channel, open in new tab, open in vertical split |
+| SSH channels | ⌘N | Add a channel |
+| SSH channels | ⌫ | Delete a channel (with confirmation) |
+| SSH channels | Esc | Clear search, close menu/form |
+| Xftp | ⌘↑ / Enter | Go to parent folder / open folder |
+| Xftp | ⌘A, ⌘-click, Shift-click | Multi-select |
+| Xftp | Space | Quick view |
+| Xftp | ⌫ | Delete (with confirmation) |
+| Xftp | ⌘L | Type a path |
 
-Phím tắt toàn cục để ẩn/hiện cửa sổ kênh SSH: vào **Settings > Keys > Key Bindings > +**, chọn Action **Invoke Script Function**, rồi nhập `xshell_toggle_sessions()` để ẩn/hiện, hoặc `xshell_focus_sessions()` để hiện và focus ô tìm kiếm.
+Global shortcut to show/hide the SSH channels window: go to **Settings > Keys > Key Bindings > +**, choose the action **Invoke Script Function**, and enter `xshell_toggle_sessions()` to toggle, or `xshell_focus_sessions()` to show it and focus the search box.
 
-## Cấu hình
+## Configuration
 
-Lưu ở `~/.config/iterm-xshell/sessions.json` (thư mục quyền `700`, file quyền `600`, ghi atomic bằng file tạm + `rename`). Phần `"settings"`:
+Stored in `~/.config/iterm-xshell/sessions.json` (directory mode `700`, file mode `600`, written atomically via a temp file + `rename`). The `"settings"` section:
 
-| Khoá | Mặc định | Ý nghĩa |
+| Key | Default | Meaning |
 |---|---|---|
-| `download_dir` | `~/Downloads` | Thư mục tải về |
-| `strict_host_key_checking` | `true` | Kiểm tra host key theo `UserKnownHostsFile` của `ssh -G`. `StrictHostKeyChecking no` trong config cũng được tôn trọng |
-| `ssh_config` | `~/.ssh/config` | File config để import và để resolve (`ssh -F`) |
-| `sessions_window` | `true` | Bật cửa sổ kênh SSH bên trái |
-| `sessions_window_make_room` | `true` | Dịch cửa sổ iTerm2 sang phải khi bên trái không đủ chỗ |
-| `sessions_in_toolbelt` | `false` | Thêm panel kênh SSH vào Toolbelt |
-| `keychain_enabled` | `true` | Cho phép lưu mật khẩu kênh trong macOS Keychain |
+| `download_dir` | `~/Downloads` | Download folder |
+| `strict_host_key_checking` | `true` | Verify host keys against the `UserKnownHostsFile` reported by `ssh -G`. `StrictHostKeyChecking no` in your config is honored |
+| `ssh_config` | `~/.ssh/config` | Config file used for import and resolution (`ssh -F`) |
+| `sessions_window` | `true` | Enable the left SSH channels window |
+| `sessions_window_make_room` | `true` | Shift the iTerm2 window right when there is not enough room on the left |
+| `sessions_in_toolbelt` | `false` | Also add the SSH channels panel to the Toolbelt |
+| `keychain_enabled` | `true` | Allow storing channel passwords in the macOS Keychain |
 
-Sửa xong thì khởi động lại daemon.
+Restart the daemon after editing.
 
-Một kênh gồm các trường `id, name, group, host, port, user, identity_file, proxy_jump, extra_args, remote_dir, color, tags, source (manual|ssh_config), missing, keychain, autotype_password`. Kênh import chỉ lưu alias trong `host`, còn HostName/Port/User do `ssh` đọc từ config lúc kết nối.
+A channel consists of the fields `id, name, group, host, port, user, identity_file, proxy_jump, extra_args, remote_dir, color, tags, source (manual|ssh_config), missing, keychain, autotype_password`. An imported channel stores only the alias in `host`; HostName/Port/User are read by `ssh` from your config at connect time.
 
-**Mật khẩu**: mặc định dựa vào SSH key/agent. Nếu bật "Lưu mật khẩu trong Keychain" cho một kênh, mật khẩu được lưu bằng `security` (service `iterm-xshell`, account là id của kênh) qua `security -i` đọc từ stdin, nên không lộ trên argv. Panel Xftp dùng mật khẩu này khi server đòi mật khẩu. Tuỳ chọn "Tự gõ mật khẩu" gõ nó vào terminal khi thấy dấu nhắc `password:` trong 30 giây đầu.
+**Passwords**: by default everything relies on SSH keys/agent. If "Save password in Keychain" is enabled for a channel, the password is stored with `security` (service `iterm-xshell`, account = the channel id) through `security -i` reading from stdin, so it never appears in argv. The Xftp panel uses this password when the server asks for one. The "Auto-type password" option types it into the terminal when a `password:` prompt shows up within the first 30 seconds.
 
-**Lệnh mở kênh**: dựng bằng `shlex.join`, ví dụ `ssh -p 2222 -i key -J bastion user@host`. Nếu có `remote_dir` thì thêm `-t … 'cd DIR && exec $SHELL -l'`. Tab mới dùng profile *custom command* `/bin/sh -c 'ssh …; …'`. Nhờ vậy tab đóng như bình thường khi ssh thoát; riêng khi ssh lỗi (mã 255) tab được giữ lại để đọc lỗi. Mỗi tab cũng sống tối thiểu 5 giây để tránh cảnh báo modal của iTerm2 (xem dưới). Chế độ "tab hiện tại" gửi lệnh ssh vào shell đang mở.
+**Open-channel command**: built with `shlex.join`, e.g. `ssh -p 2222 -i key -J bastion user@host`. If `remote_dir` is set, it adds `-t … 'cd DIR && exec $SHELL -l'`. New tabs use a *custom command* profile `/bin/sh -c 'ssh …; …'`. That way the tab closes normally when ssh exits; only when ssh fails (exit code 255) is the tab kept so you can read the error. Each tab also lives at least 5 seconds to avoid an iTerm2 modal warning (see below). The "current tab" mode sends the ssh command into the already-open shell.
 
-## Bảo mật
+## Security
 
-- Server chỉ bind `127.0.0.1` với cổng ngẫu nhiên, token ngẫu nhiên mỗi lần chạy, và mọi `/api/*` đều cần header `X-Token`. URL chứa token được truyền cho cửa sổ kênh SSH qua biến môi trường, không qua argv (để `ps` của user khác không thấy).
-- Tên file từ client luôn qua `basename`. Đường dẫn thư mục con khi upload cả thư mục bị chặn `..`, rỗng và `\0`.
-- Không log mật khẩu hay nội dung file.
-- Xoá và ghi đè luôn có xác nhận bằng modal tự vẽ, vì `confirm()`/`prompt()` không hoạt động trong webview.
+- The server binds to `127.0.0.1` only, on a random port, with a random token generated on every run, and every `/api/*` call requires the `X-Token` header. The URL containing the token is passed to the SSH channels window through an environment variable, not argv (so other users' `ps` cannot see it).
+- File names from the client always go through `basename`. Sub-folder paths in folder uploads reject `..`, empty parts and `\0`.
+- Passwords and file contents are never logged.
+- Delete and overwrite always ask for confirmation through a custom modal, because `confirm()`/`prompt()` do not work in the webview.
 
-## Đã kiểm chứng (SPEC mục 6, iTerm2 3.7.3, macOS 26.5, Apple Silicon)
+## Verified assumptions (SPEC section 6, iTerm2 3.7.3, macOS 26.5, Apple Silicon)
 
-| # | Giả định | Kết luận |
+| # | Assumption | Result |
 |---|---|---|
-| 1 | `iterm2.tool.async_register_web_view_tool(connection, name, id, reveal, url)` | **Đúng chữ ký**, trả về `None`. Webview tải được `http://127.0.0.1:<port>`, và `fetch` gửi kèm header tuỳ ý chạy được. Mỗi cửa sổ iTerm2 có một webview riêng, tải ngay cả khi Toolbelt đang ẩn. Khi daemon khởi động lại và đăng ký lại cùng `id` với URL mới, các webview đang mở tự chuyển sang URL mới. |
-| 2 | Biến `commandLine`, `jobPid`, `jobName`, `hostname`, `path` | **Có.** Khi đang ssh: `commandLine='ssh xe-pay-243'`, `jobName='ssh'`, `jobPid` là pid của ssh. Server không có Shell Integration thì `hostname`/`path` vẫn là của máy local. Có Shell Integration (thử bằng container) thì `hostname` là tên server và `path` là thư mục remote, đổi ngay khi `cd`. Biến `user.*` chưa đặt thì trả `None`. |
-| 3 | Kéo thả file từ Finder vào webview Toolbelt | **Chưa kiểm chứng trên GUI thật**, vì màn hình bị khoá suốt phiên làm việc. Đã kiểm phần JS bằng `DragEvent`/`DataTransfer` trong WKWebView (e2e/ui_snapshots.py). Kéo thả thật từ Finder nằm trong checklist còn lại. |
-| 4 | `confirm()`/`prompt()` | **Không dùng được**: `confirm()` trả `false`, `prompt()` trả `null`, `alert()` không làm gì, không có hộp thoại nào hiện ra. Đã dùng modal tự vẽ ở cả hai panel. |
-| 5 | `SSH_AUTH_SOCK` trong process script | **Có**: iTerm2 thừa hưởng `SSH_AUTH_SOCK` của launchd, trùng với `launchctl getenv SSH_AUTH_SOCK`. `run.sh` vẫn fallback sang `launchctl getenv`. Lưu ý `PATH` của iTerm2 chỉ có `/usr/bin:/bin:/usr/sbin:/sbin`, nên code gọi `/usr/bin/ssh`, `/usr/bin/security` bằng đường dẫn tuyệt đối. |
-| 6 | Tham số `asyncssh.connect` (2.24) | `known_hosts=None` **tắt** kiểm tra host key, còn mặc định thì đọc `~/.ssh/known_hosts`. `client_keys` dùng sau key của agent. `tunnel` nhận chuỗi `[user@]host[:port]` hoặc chuỗi phân cách bằng dấu phẩy. `agent_path` mặc định lấy `SSH_AUTH_SOCK`, còn `None` thì tắt agent. **Phát hiện thêm**: asyncssh tự đọc `~/.ssh/config` và khớp theo HostName chứ không theo alias, nên code truyền `config=[]` sau khi đã resolve bằng `ssh -G`. Với ProxyJump, code không dùng chuỗi `tunnel` mà tự resolve từng chặng bằng `ssh -G` (để key/known_hosts của máy jump đúng như ssh) rồi nối bằng `tunnel=<conn>`. Integration test có server password-only, ProxyJump thật và host key lạ. |
-| 7 | Toolbelt đặt bên trái | **Không được.** Không có setting, khoá defaults hay API nào. Chuỗi trợ giúp trong binary ghi: *"The toolbelt appears on the right side of your terminal window."* Theo quyết định của người dùng, panel kênh SSH được làm thành cửa sổ riêng dock bên trái. |
+| 1 | `iterm2.tool.async_register_web_view_tool(connection, name, id, reveal, url)` | **Signature is correct**, returns `None`. The webview loads `http://127.0.0.1:<port>`, and `fetch` with custom headers works. Each iTerm2 window has its own webview, loaded even while the Toolbelt is hidden. When the daemon restarts and re-registers the same `id` with a new URL, open webviews switch to the new URL automatically. |
+| 2 | Variables `commandLine`, `jobPid`, `jobName`, `hostname`, `path` | **Available.** While ssh'ing: `commandLine='ssh xe-pay-243'`, `jobName='ssh'`, `jobPid` is the ssh pid. Without Shell Integration on the server, `hostname`/`path` stay local. With Shell Integration (tested with a container), `hostname` is the server name and `path` the remote folder, updating immediately on `cd`. Unset `user.*` variables return `None`. |
+| 3 | Dragging files from Finder into the Toolbelt webview | **Not verified on a real GUI**, because the screen was locked for the whole session. The JS side was verified with `DragEvent`/`DataTransfer` in a WKWebView (e2e/ui_snapshots.py). A real Finder drag is on the remaining checklist. |
+| 4 | `confirm()`/`prompt()` | **Unusable**: `confirm()` returns `false`, `prompt()` returns `null`, `alert()` does nothing, no dialog appears. Both panels use a custom modal. |
+| 5 | `SSH_AUTH_SOCK` in the script process | **Present**: iTerm2 inherits launchd's `SSH_AUTH_SOCK`, identical to `launchctl getenv SSH_AUTH_SOCK`. `run.sh` still falls back to `launchctl getenv`. Note that iTerm2's `PATH` is only `/usr/bin:/bin:/usr/sbin:/sbin`, so the code calls `/usr/bin/ssh` and `/usr/bin/security` by absolute path. |
+| 6 | `asyncssh.connect` parameters (2.24) | `known_hosts=None` **disables** host key checking, while the default reads `~/.ssh/known_hosts`. `client_keys` is used after the agent's keys. `tunnel` accepts a `[user@]host[:port]` string or a comma-separated string. `agent_path` defaults to `SSH_AUTH_SOCK`; `None` disables the agent. **Also discovered**: asyncssh reads `~/.ssh/config` itself and matches by HostName, not by alias, so the code passes `config=[]` after resolving with `ssh -G`. For ProxyJump, the code does not use the `tunnel` string; it resolves each hop with `ssh -G` (so the jump host's key/known_hosts behave exactly like ssh) and chains them with `tunnel=<conn>`. Integration tests include a password-only server, a real ProxyJump and an unknown host key. |
+| 7 | Toolbelt on the left | **Not possible.** There is no setting, defaults key or API. The help string in the binary says: *"The toolbelt appears on the right side of your terminal window."* Per the user's decision, the SSH channels panel is a separate window docked on the left. |
 
-Phát hiện thêm khi chạy thật:
-- **Script "full environment" của iTerm2 không dùng được venv tự dựng.** iTerm2 3.7 đòi `iterm2env-metadata.json` và runtime do chính nó tải. Thiếu thì nó hiện hộp thoại "Upgrade Python Runtime?" và không chạy script. Vì vậy install.sh dùng AutoLaunch `.scpt` + venv riêng, và luồng này đã được kiểm chứng: cookie API, `SSH_AUTH_SOCK`, đăng ký tool.
-- **Cảnh báo modal "A session ended very soon after starting"**: khi một session dùng custom command kết thúc trong vài giây, iTerm2 hiện cảnh báo này (advanced setting `shortLivedSessionDuration`). Trong lúc nó mở, **toàn bộ Python API bị treo**, kể cả kết nối mới. Cách xử lý: wrapper giữ tab sống tối thiểu 5 giây, mọi RPC tới iTerm2 có timeout 4 giây, và panel báo "iTerm2 không phản hồi (có hộp thoại đang mở?)" thay vì treo.
-- Trên Apple Silicon, Python universal2 được gọi từ một process x86 (ví dụ `timeout` của Homebrew Intel cũ) sẽ chạy dưới Rosetta và không load được wheel arm64. `install.sh`/`run.sh` vì vậy luôn chạy qua `arch -arm64`.
-- Tên file trong `filename=` của multipart bị escape không thống nhất: WebKit chỉ đổi `"` thành `%22`, còn aiohttp client thì percent-encode toàn bộ. UI gửi thêm field `name` chứa tên gốc UTF-8.
-- `sftp.get(..., recurse=True)` mặc định chép symlink thành symlink, nên dùng `follow_symlinks=True` để tải về được thư mục mà symlink trỏ tới.
+Additional findings from real runs:
+- **iTerm2's "full environment" scripts cannot use a self-built venv.** iTerm2 3.7 requires `iterm2env-metadata.json` and a runtime it downloads itself. Without them it shows an "Upgrade Python Runtime?" dialog and does not run the script. Therefore install.sh uses an AutoLaunch `.scpt` plus its own venv, and this flow has been verified: API cookie, `SSH_AUTH_SOCK`, tool registration.
+- **Modal warning "A session ended very soon after starting"**: when a session using a custom command ends within a few seconds, iTerm2 shows this warning (advanced setting `shortLivedSessionDuration`). While it is open, the **entire Python API hangs**, including new connections. Mitigation: the wrapper keeps the tab alive for at least 5 seconds, every RPC to iTerm2 has a 4-second timeout, and the panel reports "iTerm2 is not responding (is a dialog open?)" instead of hanging.
+- On Apple Silicon, a universal2 Python launched from an x86 process (e.g. an old Intel Homebrew `timeout`) runs under Rosetta and cannot load arm64 wheels. `install.sh`/`run.sh` therefore always run through `arch -arm64`.
+- File names in multipart `filename=` are escaped inconsistently: WebKit only turns `"` into `%22`, while the aiohttp client percent-encodes everything. The UI also sends a `name` field with the original UTF-8 name.
+- `sftp.get(..., recurse=True)` copies symlinks as symlinks by default, so `follow_symlinks=True` is used to download the folder a symlink points to.
 
-## Test
+## Tests
 
 ```bash
-./install.sh --dev --no-start          # hoặc tự tạo venv từ requirements-dev.txt
+./install.sh --dev --no-start          # or create a venv yourself from requirements-dev.txt
 ~/Library/Application\ Support/iterm-xshell/venv/bin/python -m pytest -q
 ```
 
-- **Unit** (`tests/test_*.py`): parse lệnh ssh (`-p`, `-p2222`, `-l`, `-o Port=`, `-o User=`, `-J`, `ssh://`, option có tham số, remote command, lệnh không phải ssh); import `~/.ssh/config` (nhiều host một dòng, wildcard, `Include` lồng nhau/glob/tương đối/vòng lặp, comment, `=`, hoa thường lẫn lộn); store (CRUD, ghi atomic, quyền file, đồng bộ không mất kênh `manual`); dựng lệnh ssh (escaping, `remote_dir`); wrapper tab; hình học dock.
-- **Integration** (`tests/integration/`): SFTP server asyncssh thật chạy trong test, gồm 3 server (key, chỉ mật khẩu, jump), gọi API bằng aiohttp test client. Các case: list/upload/download/mkdir/rename/delete, file 300 MB (sha256), tên có dấu cách + tiếng Việt + nháy, symlink tới thư mục và symlink hỏng, path traversal, upload cả thư mục, huỷ upload giữa chừng, mất kết nối thì tự nối lại, password-only trả `code: "auth"`, host key lạ trả `code: "hostkey"`, ProxyJump, API kênh SSH, đồng bộ config theo mtime.
-- **UI** (`e2e/ui_snapshots.py`): nạp hai panel vào WKWebView offscreen (sáng/tối, rộng 280px) với backend thật, mô phỏng click/chuột phải/form/kéo thả, rồi chụp ảnh vào `e2e/screenshots/`.
-- **E2E trên iTerm2** (`e2e/run_e2e.py`): lái iTerm2 thật qua Python API + HTTP API của daemon đã cài, dùng container `linuxserver/openssh-server` (một container có Shell Integration).
+- **Unit** (`tests/test_*.py`): ssh command parsing (`-p`, `-p2222`, `-l`, `-o Port=`, `-o User=`, `-J`, `ssh://`, options with arguments, remote commands, non-ssh commands); `~/.ssh/config` import (several hosts per line, wildcards, nested/glob/relative/circular `Include`, comments, `=`, mixed case); the store (CRUD, atomic writes, file permissions, sync without losing `manual` channels); ssh command building (escaping, `remote_dir`); the tab wrapper; dock geometry.
+- **Integration** (`tests/integration/`): a real asyncssh SFTP server running inside the tests, with 3 servers (key, password-only, jump), called through the aiohttp test client. Cases: list/upload/download/mkdir/rename/delete, a 300 MB file (sha256), names with spaces + Vietnamese characters + quotes, symlinks to folders and broken symlinks, path traversal, folder upload, cancelling an upload midway, automatic reconnect after a lost connection, password-only servers returning `code: "auth"`, unknown host keys returning `code: "hostkey"`, ProxyJump, the SSH channels API, mtime-based config sync, background download jobs.
+- **UI** (`e2e/ui_snapshots.py`): loads both panels into an offscreen WKWebView (light/dark, 280px wide) against a real backend, simulates click/right-click/forms/drag-and-drop, and saves screenshots to `e2e/screenshots/`.
+- **E2E on iTerm2** (`e2e/run_e2e.py`): drives a real iTerm2 through the Python API plus the installed daemon's HTTP API, using a `linuxserver/openssh-server` container (one container has Shell Integration).
 
-## Hạn chế còn lại
+## Known limitations
 
-- Toolbelt luôn ở bên phải. Panel kênh SSH là cửa sổ riêng dock bên trái nên:
-  - với cửa sổ iTerm2 full-screen kiểu native, panel đè lên mép trái nội dung terminal (không thể chia Space);
-  - panel bám theo bằng cách hỏi vị trí mỗi 150 ms, nên khi kéo cửa sổ iTerm2 panel trễ một nhịp;
-  - hotkey window (cửa sổ nổi) của iTerm2 không được dock.
-- Key có passphrase mà không nạp vào ssh-agent (`ssh-add --apple-use-keychain`) thì panel Xftp không dùng được (asyncssh bỏ qua key mã hoá). Terminal vẫn ssh bình thường.
-- `ProxyCommand` được truyền sang asyncssh (thay `%h %p %r %n`). `Match exec` và các tính năng chỉ OpenSSH có vẫn được `ssh -G` resolve, nhưng asyncssh có thể không hỗ trợ hết thuật toán/cipher hiếm.
-- Panel Xftp đi theo thư mục terminal chỉ khi server có Shell Integration.
-- "Tự gõ mật khẩu" chỉ nhận dấu nhắc kiểu `password:` (không nhận OTP/2FA).
-- Mỗi lần iTerm2 khởi động, script AutoLaunch xin cookie qua AppleScript. Lần đầu macOS có thể hỏi quyền Automation.
+- The Toolbelt is always on the right. The SSH channels panel is a separate window docked on the left, so:
+  - with a native full-screen iTerm2 window, the panel overlaps the left edge of the terminal content (Spaces cannot be split);
+  - the panel follows by polling the position every 150 ms, so it lags a beat when you drag the iTerm2 window;
+  - iTerm2's hotkey (floating) window is not docked.
+- A passphrase-protected key that is not loaded into ssh-agent (`ssh-add --apple-use-keychain`) cannot be used by the Xftp panel (asyncssh skips encrypted keys). The terminal still ssh's normally.
+- `ProxyCommand` is passed to asyncssh (with `%h %p %r %n` substituted). `Match exec` and other OpenSSH-only features are still resolved by `ssh -G`, but asyncssh may not support every rare algorithm/cipher.
+- The Xftp panel follows the terminal's folder only when the server has Shell Integration.
+- "Auto-type password" only recognizes `password:`-style prompts (not OTP/2FA).
+- On every iTerm2 start, the AutoLaunch script requests the cookie through AppleScript. The first time, macOS may ask for Automation permission.
 
 ## License
 
-MIT © 2026 DuongTx — xem [LICENSE](LICENSE).
+MIT © 2026 DuongTx — see [LICENSE](LICENSE).
