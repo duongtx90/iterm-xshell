@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xftp</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--mut:#86868b;--line:#e3e3e0;--hov:#f0f0ee;--sel:#dbe7ff;--acc:#2f6fed;--err:#c4382c;--bar:#f3f3f1}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--fg:#e8e8ea;--mut:#8e8e93;--line:#333336;--hov:#2a2a2d;--sel:#1f3a6b;--acc:#5b8dff;--err:#ff6b5e;--bar:#232326}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:12px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;-webkit-user-select:none;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+.top{padding:8px 8px 6px;border-bottom:1px solid var(--line);background:var(--bar)}
+.host{display:flex;gap:6px;align-items:center;margin-bottom:6px;min-width:0}
+.host b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex:none}
+.dot.on{background:#34c759}
+.tools{display:flex;gap:2px;align-items:center}
+button{font:inherit;color:var(--fg);background:none;border:1px solid transparent;border-radius:5px;padding:3px 6px;cursor:pointer;line-height:1.2}
+button:hover:not(:disabled){background:var(--hov);border-color:var(--line)}
+button:disabled{opacity:.35;cursor:default}
+button.on{color:var(--acc)}
+.grow{flex:1}
+input[type=text],input[type=password]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:100%;outline:none;-webkit-user-select:text;user-select:text}
+input::placeholder{color:var(--mut);opacity:.75}
+input:focus{border-color:var(--acc)}
+.pathrow{margin-top:6px;display:flex;gap:4px;align-items:center}
+.pathrow input{flex:1;min-width:0}
+#list{flex:1;overflow:auto;position:relative;padding:2px 0}
+#list.drag{outline:2px dashed var(--acc);outline-offset:-6px;background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.row{display:flex;align-items:center;gap:6px;padding:3px 10px;cursor:default;white-space:nowrap}
+.row:hover{background:var(--hov)}
+.row.sel{background:var(--sel)}
+.ic{width:16px;text-align:center;flex:none}
+.nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+.nm.broken{color:var(--err)}
+.sz,.tm{color:var(--mut);font-variant-numeric:tabular-nums;flex:none}
+.tm{width:92px;text-align:right}
+@media (max-width:300px){.tm{display:none}}
+.empty{color:var(--mut);padding:24px 14px;text-align:center;line-height:1.6}
+.acts{display:flex;gap:2px;padding:5px 6px;border-top:1px solid var(--line);background:var(--bar);flex-wrap:wrap;align-items:center}
+.status{display:flex;gap:6px;align-items:center;padding:4px 10px 6px;color:var(--mut);background:var(--bar)}
+.status span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err span{color:var(--err)}
+#bCancel{display:none;color:var(--err)}
+.prog{height:3px;background:var(--line);display:none}
+.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .15s}
+#jobs{background:var(--bar);border-top:1px solid var(--line)}
+#jobs:empty{display:none}
+.job{padding:5px 10px 6px;border-bottom:1px solid var(--line)}
+.job:last-child{border-bottom:0}
+.job .jt{display:flex;gap:6px;align-items:center}
+.job .jn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job .js{color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.job .jb{height:4px;background:var(--line);border-radius:2px;margin-top:3px;overflow:hidden}
+.job .jb i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+.job .jb.ind i{width:35%;animation:ind 1.1s linear infinite}
+@keyframes ind{from{margin-left:-35%}to{margin-left:100%}}
+.job.error .js,.job.cancelled .js{color:var(--err)}
+.job.done .jb i{background:#34c759}
+.job button{padding:0 5px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:flex-start;justify-content:center;padding-top:50px;z-index:9}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;width:calc(100% - 24px);max-width:320px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
+.box p{margin:0 0 8px;white-space:pre-wrap;word-break:break-word}
+.box .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:10px}
+.box .ok{background:var(--acc);color:#fff}
+.box .ok.danger{background:var(--err)}
+#viewer .box{max-width:none;height:calc(100% - 70px);display:flex;flex-direction:column}
+#viewer pre{flex:1;overflow:auto;margin:0;padding:8px;border:1px solid var(--line);border-radius:5px;font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre;-webkit-user-select:text;user-select:text}
+#viewer .vh{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+#viewer .vh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+label.chk{display:flex;gap:4px;align-items:center;color:var(--mut);cursor:pointer}
+.chan{font-size:10px;padding:0 5px;border-radius:8px;background:var(--hov);color:var(--mut);flex:none}
+</style></head>
+<body><div id="app">
+ <div class="top">
+  <div class="host"><span class="dot" id="dot"></span><b id="hostLabel">Chưa có phiên SSH</b><span class="chan" id="chan" hidden></span>
+   <button id="bManual" title="Kết nối tới host khác">⇄</button></div>
+  <div class="tools">
+   <button id="bUp" title="Lên thư mục cha (⌘↑)">↑</button>
+   <button id="bHome" title="Thư mục home">⌂</button>
+   <button id="bRefresh" title="Tải lại">⟳</button>
+   <button id="bFollow" class="on" title="Đi theo thư mục của terminal (cần Shell Integration trên server)">⇵ theo terminal</button>
+   <span class="grow"></span>
+   <button id="bMkdir" title="Thư mục mới">＋📁</button>
+   <button id="bUpload" title="Upload file">⤒</button>
+  </div>
+  <div class="pathrow"><input type="text" id="path" spellcheck="false" placeholder="/đường/dẫn"><button id="aCd" title="cd terminal tới thư mục này">cd ↵</button></div>
+ </div>
+ <div id="list"><div class="empty">Mở một tab đang <b>ssh</b> vào server,<br>hoặc bấm ⇄ để nhập host.</div></div>
+ <div class="prog" id="prog"><i></i></div>
+ <div class="acts">
+  <button id="aDown" disabled>⤓ Tải về</button>
+  <button id="aView" disabled title="Xem nhanh file text (Space)">Xem</button>
+  <button id="aRen" disabled>Đổi tên</button>
+  <button id="aDel" disabled>Xoá</button>
+  <span class="grow"></span>
+  <label class="chk" title="Hiện file ẩn"><input type="checkbox" id="hidden" checked> ẩn</label>
+ </div>
+ <div id="jobs"></div>
+ <div class="status" id="status"><span id="statusText">&nbsp;</span><button id="bCancel" title="Huỷ upload">✕ Huỷ</button></div>
+</div>
+<input type="file" id="picker" multiple hidden>
+<div class="modal" id="modal"><div class="box"><p id="mMsg"></p>
+ <input type="text" id="mInput"><div class="btns"><button id="mCancel">Huỷ</button><button class="ok" id="mOk">OK</button></div></div></div>
+<div class="modal" id="viewer"><div class="box"><div class="vh"><b id="vName"></b><button id="vClose">Đóng</button></div><pre id="vText"></pre></div></div>
+<script>
+const T = new URLSearchParams(location.search).get('t');
+const $ = id => document.getElementById(id);
+const enc = encodeURIComponent;
+let target = null, manual = false, cwd = null, entries = [], selected = new Set();
+let lastClick = null, follow = true, termPath = null, sessionId = null, busy = false, channel = null;
+let uploadXhr = null;
+
+async function api(path, opts = {}) {
+  const o = {method: opts.method || 'GET', headers: {'X-Token': T}};
+  if (opts.json !== undefined) { o.method = opts.method || 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(opts.json); }
+  const r = await fetch(path, o);
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) { const e = new Error(d.error || ('HTTP ' + r.status)); e.code = d.code; throw e; }
+  return d;
+}
+function tq() { return ['alias', 'user', 'port', 'jump', 'identity', 'channel'].map(k => k + '=' + enc(target[k] || '')).join('&'); }
+function join(a, b) { return a === '/' ? '/' + b : a + '/' + b; }
+function parent(p) { if (!p || p === '/') return '/'; const i = p.replace(/\/+$/, '').lastIndexOf('/'); return i <= 0 ? '/' : p.slice(0, i); }
+function setStatus(m, err) { $('statusText').textContent = m || ' '; $('status').className = 'status' + (err ? ' err' : ''); }
+function fmtSize(n) { if (n < 1024) return n + ' B'; const u = ['KB','MB','GB','TB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 3); return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i]; }
+function fmtTime(t) { if (!t) return ''; const d = new Date(t * 1000), p = x => String(x).padStart(2, '0'); return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(2) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+
+// confirm()/prompt() không chạy trong webview của Toolbelt (trả về false/null) -> modal tự vẽ.
+function modal(msg, {input = null, ok = 'OK', danger = false, password = false} = {}) {
+  return new Promise(res => {
+    $('mMsg').textContent = msg;
+    const inp = $('mInput');
+    inp.style.display = input === null ? 'none' : '';
+    inp.type = password ? 'password' : 'text';
+    inp.value = input || '';
+    $('mOk').textContent = ok; $('mOk').className = 'ok' + (danger ? ' danger' : '');
+    $('modal').style.display = 'flex';
+    setTimeout(() => { if (input !== null) { inp.focus(); inp.select(); } else $('mOk').focus(); }, 0);
+    const done = v => { $('modal').style.display = 'none'; $('mOk').onclick = $('mCancel').onclick = inp.onkeydown = $('modal').onkeydown = null; res(v); };
+    $('mOk').onclick = () => done(input === null ? true : inp.value);
+    $('mCancel').onclick = () => done(null);
+    $('modal').onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(input === null ? true : inp.value); } };
+  });
+}
+
+async function handleErr(e, retry) {
+  if (e.code === 'auth') {
+    const pw = await modal(e.message + '\n' + target.label, {input: '', ok: 'Kết nối', password: true});
+    if (pw !== null) { await api('/api/password', {json: {target, password: pw}}); return retry(); }
+    setStatus('Chưa kết nối', true);
+  } else setStatus('Lỗi: ' + e.message, true);
+}
+
+async function load(path) {
+  if (!target) return;
+  setStatus('Đang tải…');
+  try {
+    const d = await api('/api/list?' + tq() + '&path=' + enc(path || ''));
+    if (d.path !== cwd) { selected.clear(); lastClick = null; }
+    cwd = d.path; entries = d.entries;
+    render(); setStatus(entries.length + ' mục');
+  } catch (e) { await handleErr(e, () => load(path)); }
+}
+
+function visible() {
+  const show = $('hidden').checked;
+  return entries.filter(e => show || !e.name.startsWith('.'))
+    .sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+}
+
+function render() {
+  if (document.activeElement !== $('path')) $('path').value = cwd || '';
+  const list = $('list'); list.innerHTML = '';
+  const vis = visible();
+  if (!target) list.innerHTML = '<div class="empty">Mở một tab đang <b>ssh</b> vào server,<br>hoặc bấm ⇄ để nhập host.</div>';
+  else if (!vis.length && cwd) list.innerHTML = '<div class="empty">Thư mục trống.<br>Kéo thả file/thư mục vào đây để upload.</div>';
+  vis.forEach((e, idx) => {
+    const r = document.createElement('div');
+    r.className = 'row' + (selected.has(e.name) ? ' sel' : '');
+    r.title = e.mode + '  ' + e.name;
+    r.innerHTML = '<span class="ic"></span><span class="nm"></span><span class="sz"></span><span class="tm"></span>';
+    r.children[0].textContent = e.dir ? (e.link ? '📂' : '📁') : (e.link ? '🔗' : '📄');
+    r.children[1].textContent = e.name + (e.link && e.dir ? ' →' : '');
+    if (e.broken) r.children[1].classList.add('broken');
+    r.children[2].textContent = e.dir ? '' : fmtSize(e.size);
+    r.children[3].textContent = fmtTime(e.mtime);
+    r.onclick = ev => {
+      if (ev.metaKey || ev.ctrlKey) { selected.has(e.name) ? selected.delete(e.name) : selected.add(e.name); }
+      else if (ev.shiftKey && lastClick !== null) {
+        const [a, b] = [Math.min(lastClick, idx), Math.max(lastClick, idx)];
+        selected = new Set(vis.slice(a, b + 1).map(x => x.name));
+      } else selected = new Set([e.name]);
+      if (!ev.shiftKey) lastClick = idx;
+      render();
+    };
+    r.ondblclick = () => e.dir ? load(join(cwd, e.name)) : download([e.name]);
+    list.appendChild(r);
+  });
+  const n = selected.size, has = !!(target && cwd);
+  const one = n === 1 ? entries.find(x => x.name === [...selected][0]) : null;
+  $('aDown').disabled = !n; $('aDel').disabled = !n; $('aRen').disabled = n !== 1;
+  $('aView').disabled = !(one && !one.dir);
+  ['bUp','bHome','bRefresh','bMkdir','bUpload','aCd'].forEach(id => $(id).disabled = !has);
+  $('bUpload').disabled = !has || !!uploadXhr;
+  $('aCd').disabled = !has || manual;
+  $('bFollow').disabled = manual;
+  $('bFollow').classList.toggle('on', follow && !manual);
+  $('hostLabel').textContent = target ? target.label : 'Chưa có phiên SSH';
+  $('hostLabel').title = target ? target.label : '';
+  $('chan').hidden = !(channel && !manual);
+  if (channel) $('chan').textContent = channel.name;
+  $('dot').classList.toggle('on', !!target);
+}
+
+async function setTarget(t, path) {
+  target = t; cwd = null; entries = []; selected.clear(); render();
+  if (t) await load(path || '');
+}
+
+async function poll() {
+  if (busy) return; busy = true;
+  try {
+    const c = await api('/api/context');
+    sessionId = c.session_id; channel = c.channel;
+    if (!manual) {
+      if (JSON.stringify(c.target) !== JSON.stringify(target)) {
+        termPath = c.path;
+        await setTarget(c.target, c.path || (c.channel && c.channel.remote_dir) || '');
+      }
+      else if (follow && c.path && c.path !== termPath) { termPath = c.path; await load(c.path); }
+      else render();
+    }
+  } catch (e) { if (e.code === 'busy') setStatus(e.message, true); } finally { busy = false; }
+}
+
+// ---- upload: [{file, rel}] với rel = thư mục con tương đối (khi kéo thả cả thư mục)
+function readAllEntries(reader) {
+  return new Promise((res, rej) => { const all = []; const next = () => reader.readEntries(b => { if (!b.length) res(all); else { all.push(...b); next(); } }, rej); next(); });
+}
+async function walk(entry, rel, out) {
+  if (entry.isFile) { const f = await new Promise((res, rej) => entry.file(res, rej)); out.push({file: f, rel}); }
+  else if (entry.isDirectory) {
+    const sub = rel ? rel + '/' + entry.name : entry.name;
+    const kids = await readAllEntries(entry.createReader());
+    if (!kids.length) out.push({file: null, rel: sub});
+    for (const k of kids) await walk(k, sub, out);
+  }
+}
+
+async function uploadItems(items) {
+  if (!target || !cwd || !items.length || uploadXhr) return;
+  const names = new Set(entries.map(e => e.name));
+  const tops = [...new Set(items.map(i => i.rel ? i.rel.split('/')[0] : i.file.name))];
+  const clash = tops.filter(n => names.has(n));
+  if (clash.length) {
+    const ok = await modal('Ghi đè ' + clash.length + ' mục đã có trên server?\n' + clash.slice(0, 6).join('\n') + (clash.length > 6 ? '\n…' : '') + '\n(thư mục sẽ được gộp, file trùng tên bị ghi đè)', {ok: 'Ghi đè', danger: true});
+    if (!ok) return;
+  }
+  const files = items.filter(i => i.file);
+  const emptyDirs = items.filter(i => !i.file).map(i => i.rel);
+  const go = () => new Promise(resolve => {
+    const fd = new FormData();
+    files.forEach(i => { if (i.rel) fd.append('rel', i.rel); fd.append('name', i.file.name); fd.append('file', i.file, i.file.name); });
+    const x = new XMLHttpRequest(); uploadXhr = x;
+    x.open('POST', '/api/upload?' + tq() + '&path=' + enc(cwd) + '&overwrite=1');
+    x.setRequestHeader('X-Token', T);
+    $('prog').style.display = 'block'; $('prog').firstChild.style.width = '0';
+    $('bCancel').style.display = 'inline-block'; render();
+    const total = files.reduce((s, i) => s + i.file.size, 0);
+    setStatus('Đang upload ' + files.length + ' file (' + fmtSize(total) + ')…');
+    x.upload.onprogress = e => { if (e.lengthComputable) { const p = 100 * e.loaded / e.total; $('prog').firstChild.style.width = p + '%'; setStatus('Đang upload… ' + Math.round(p) + '% (' + fmtSize(e.loaded) + ' / ' + fmtSize(e.total) + ')'); } };
+    x.onloadend = async () => {
+      uploadXhr = null;
+      $('prog').style.display = 'none'; $('bCancel').style.display = 'none';
+      let d = {}; try { d = JSON.parse(x.responseText); } catch (_) {}
+      if (x.status === 0) { setStatus('Đã huỷ upload', true); await load(cwd); }
+      else if (x.status === 200) { setStatus('Đã upload ' + d.uploaded + ' file'); await load(cwd); }
+      else { const e = new Error(d.error || 'Upload lỗi (' + x.status + ')'); e.code = d.code; await handleErr(e, go); }
+      resolve();
+    };
+    x.send(fd);
+  });
+  for (const rel of emptyDirs) {
+    let d = cwd;
+    for (const p of rel.split('/')) { d = join(d, p); try { await api('/api/mkdir', {json: {target, dir: parent(d), name: p}}); } catch (_) {} }
+  }
+  if (files.length) await go(); else if (emptyDirs.length) { setStatus('Đã tạo thư mục'); await load(cwd); }
+}
+
+// ---- download chạy nền trong daemon: tiến trình lấy từ /api/jobs nên còn nguyên khi đổi phiên/tải lại panel
+let jobsPrev = {}, jobsTimer = null;
+async function download(names) {
+  try {
+    const d = await api('/api/download', {json: {target, dir: cwd, names, background: true}});
+    setStatus('Đã bắt đầu tải ' + names.length + ' mục — xem tiến trình bên dưới');
+    pollJobs();
+  } catch (e) { await handleErr(e, () => download(names)); }
+}
+function fmtDur(s) { s = Math.round(s); return s < 60 ? s + 's' : s < 3600 ? Math.floor(s / 60) + 'm' + String(s % 60).padStart(2, '0') + 's' : Math.floor(s / 3600) + 'h' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + 'm'; }
+function renderJobs(list) {
+  const box = $('jobs'), now = Date.now() / 1000, seen = {};
+  const keep = new Set(list.map(j => j.id));
+  [...box.children].forEach(c => { if (!keep.has(c.dataset.id)) c.remove(); });
+  list.forEach(j => {
+    let el = box.querySelector('[data-id="' + j.id + '"]');
+    if (!el) {
+      el = document.createElement('div'); el.dataset.id = j.id;
+      el.innerHTML = '<div class="jt"><span class="jn"></span><button class="jx"></button></div><div class="jb"><i></i></div><div class="js"></div>';
+      el.querySelector('.jx').onclick = async () => {
+        await api('/api/jobs/' + (el.dataset.state === 'running' ? 'cancel' : 'dismiss'), {json: {id: j.id}}).catch(() => {});
+        pollJobs();
+      };
+      box.appendChild(el);
+    }
+    el.className = 'job ' + j.state; el.dataset.state = j.state;
+    const nm = j.names.length === 1 ? j.names[0] : j.names.length + ' mục';
+    el.querySelector('.jn').textContent = '⤓ ' + nm; el.querySelector('.jn').title = j.host + ':' + j.dir + '/' + j.names.join(', ');
+    const x = el.querySelector('.jx'); x.textContent = j.state === 'running' ? '✕ Huỷ' : '✕'; x.title = j.state === 'running' ? 'Huỷ tải' : 'Ẩn';
+    const bar = el.querySelector('.jb'), fill = bar.firstChild, st = el.querySelector('.js');
+    const pct = j.total ? Math.min(100, 100 * j.done / j.total) : 0;
+    bar.classList.toggle('ind', j.state === 'running' && !j.total);
+    fill.style.width = j.state === 'done' ? '100%' : (j.state === 'running' && !j.total ? '' : pct + '%');
+    let txt;
+    if (j.state === 'running') {
+      const p = jobsPrev[j.id], dt = p ? now - p.t : 0;
+      let sp = p && dt > 0 ? (j.done - p.done) / dt : 0;
+      sp = p && p.sp !== undefined ? (p.sp * 0.6 + sp * 0.4) : sp;
+      seen[j.id] = {t: now, done: j.done, sp};
+      const stall = now - j.updated;
+      if (j.phase === 'scan') txt = 'Đang quét dung lượng…';
+      else {
+        txt = (j.total ? Math.round(pct) + '% · ' + fmtSize(j.done) + ' / ' + fmtSize(j.total) : fmtSize(j.done)) + (sp > 1 ? ' · ' + fmtSize(sp) + '/s' : '');
+        if (j.total && sp > 1) txt += ' · còn ~' + fmtDur((j.total - j.done) / sp);
+        if (stall > 15) txt += ' · ⚠ không có dữ liệu mới ' + fmtDur(stall);
+        else if (j.current && j.names.length > 1 || j.current && j.current !== j.names[0]) txt += ' · ' + j.current;
+      }
+    } else if (j.state === 'done') txt = 'Xong · ' + fmtSize(j.done) + ' → ' + j.dest + ' · ' + fmtDur(j.finished - j.started);
+    else if (j.state === 'cancelled') txt = 'Đã huỷ';
+    else txt = 'Lỗi: ' + j.error;
+    st.textContent = txt; st.title = txt;
+  });
+  jobsPrev = seen;
+}
+async function pollJobs() {
+  clearTimeout(jobsTimer); jobsTimer = null;
+  let running = false;
+  try {
+    const d = await api('/api/jobs');
+    renderJobs(d.jobs); running = d.jobs.some(j => j.state === 'running');
+  } catch (_) { running = !!$('jobs').querySelector('.job.running'); }
+  jobsTimer = setTimeout(pollJobs, running ? 1000 : 5000);
+}
+
+async function action(fn, okMsg) {
+  try { await fn(); if (okMsg) setStatus(okMsg); await load(cwd); }
+  catch (e) { await handleErr(e, () => action(fn, okMsg)); }
+}
+
+async function quickView() {
+  const n = [...selected][0]; if (!n) return;
+  const en = entries.find(x => x.name === n); if (!en || en.dir) return;
+  try {
+    const d = await api('/api/view?' + tq() + '&path=' + enc(join(cwd, n)));
+    $('vName').textContent = n + (d.truncated ? '  (256 KB đầu / ' + fmtSize(d.size) + ')' : '');
+    $('vText').textContent = d.text; $('viewer').style.display = 'flex'; $('vClose').focus();
+  } catch (e) { await handleErr(e, quickView); }
+}
+$('vClose').onclick = () => { $('viewer').style.display = 'none'; };
+
+// ---- events
+$('bUp').onclick = () => load(parent(cwd));
+$('bHome').onclick = () => load('~');
+$('bRefresh').onclick = () => load(cwd);
+$('bFollow').onclick = () => { follow = !follow; render(); if (follow) { termPath = null; poll(); } };
+$('hidden').onchange = render;
+$('path').onkeydown = e => { if (e.key === 'Enter') { load($('path').value.trim()); $('path').blur(); } if (e.key === 'Escape') { $('path').value = cwd || ''; $('path').blur(); } };
+$('bUpload').onclick = () => $('picker').click();
+$('picker').onchange = () => { uploadItems([...$('picker').files].map(f => ({file: f, rel: ''}))); $('picker').value = ''; };
+$('bCancel').onclick = () => { if (uploadXhr) uploadXhr.abort(); };
+$('bMkdir').onclick = async () => { const n = await modal('Tên thư mục mới', {input: '', ok: 'Tạo'}); if (n) action(() => api('/api/mkdir', {json: {target, dir: cwd, name: n}}), 'Đã tạo ' + n); };
+$('aDown').onclick = () => download([...selected]);
+$('aView').onclick = quickView;
+$('aRen').onclick = async () => { const old = [...selected][0]; const n = await modal('Đổi tên', {input: old, ok: 'Đổi'}); if (n && n !== old) action(() => api('/api/rename', {json: {target, dir: cwd, old, new: n}}).then(() => { selected = new Set([n]); }), 'Đã đổi tên'); };
+$('aDel').onclick = async () => {
+  const names = [...selected];
+  const ok = await modal('Xoá vĩnh viễn ' + names.length + ' mục trên server?\n' + names.slice(0, 6).join('\n') + (names.length > 6 ? '\n…' : ''), {ok: 'Xoá', danger: true});
+  if (ok) action(() => api('/api/delete', {json: {target, dir: cwd, names}}).then(() => selected.clear()), 'Đã xoá');
+};
+$('aCd').onclick = () => api('/api/cd', {json: {session_id: sessionId, path: cwd}}).then(() => setStatus('Đã cd terminal tới ' + cwd)).catch(e => setStatus('Lỗi: ' + e.message, true));
+$('bManual').onclick = async () => {
+  const v = await modal('Kết nối tới (alias trong ~/.ssh/config hoặc user@host:port).\nĐể trống để quay về theo terminal.', {input: manual && target ? target.label : '', ok: 'Kết nối'});
+  if (v === null) return;
+  if (!v.trim()) { manual = false; target = null; termPath = null; render(); poll(); return; }
+  let s = v.trim(), user = null, port = null;
+  if (s.includes('@')) { user = s.slice(0, s.lastIndexOf('@')); s = s.slice(s.lastIndexOf('@') + 1); }
+  const m = s.match(/^(.*):(\d+)$/); if (m) { s = m[1]; port = +m[2]; }
+  manual = true;
+  await setTarget({alias: s, user, port, label: v.trim()}, '');
+};
+const list = $('list');
+list.addEventListener('dragover', e => { e.preventDefault(); if (target && cwd) list.classList.add('drag'); });
+list.addEventListener('dragleave', e => { if (e.target === list) list.classList.remove('drag'); });
+list.addEventListener('drop', async e => {
+  e.preventDefault(); list.classList.remove('drag');
+  if (!target || !cwd) return;
+  // Phải lấy entry ngay trong sự kiện drop (DataTransfer hết hạn sau await).
+  const ents = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  const plain = [...e.dataTransfer.files];
+  let items = plain.map(f => ({file: f, rel: ''}));
+  if (ents.some(en => en.isDirectory)) {
+    // Có thư mục: duyệt cây để giữ cấu trúc; lỗi thì quay về danh sách file phẳng.
+    setStatus('Đang đọc danh sách file…');
+    const walked = [];
+    try { for (const en of ents) await walk(en, '', walked); items = walked; }
+    catch (err) { if (!plain.length) { setStatus('Không đọc được thư mục: ' + err, true); return; } }
+  }
+  uploadItems(items);
+});
+document.addEventListener('keydown', e => {
+  if ($('viewer').style.display === 'flex') { if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); $('vClose').click(); } return; }
+  if ($('modal').style.display === 'flex') return;
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if ((e.key === 'Backspace' || e.key === 'Delete') && selected.size) $('aDel').click();
+  else if (e.key === 'Enter' && selected.size === 1) { const en = entries.find(x => x.name === [...selected][0]); if (en && en.dir) load(join(cwd, en.name)); }
+  else if (e.key === ' ' && selected.size === 1) { e.preventDefault(); quickView(); }
+  else if (e.metaKey && e.key === 'ArrowUp') $('bUp').click();
+  else if (e.metaKey && e.key === 'a') { e.preventDefault(); selected = new Set(visible().map(x => x.name)); render(); }
+  else if (e.metaKey && e.key === 'l') { e.preventDefault(); $('path').focus(); $('path').select(); }
+});
+
+render(); poll(); setInterval(poll, 1500); pollJobs();
+</script></body></html>

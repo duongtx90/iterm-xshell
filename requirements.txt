@@ -1,0 +1,5 @@
+iterm2>=2.7
+aiohttp>=3.9
+asyncssh>=2.14
+pyobjc-framework-WebKit>=10.0
+pyobjc-framework-Quartz>=10.0

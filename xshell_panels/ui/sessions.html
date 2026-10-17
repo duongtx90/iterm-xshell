@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kênh SSH</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--mut:#86868b;--line:#e3e3e0;--hov:#f0f0ee;--sel:#dbe7ff;--acc:#2f6fed;--err:#c4382c;--bar:#f3f3f1;--ok:#2fa84f
+;--c-red:#e64c3c;--c-orange:#f09632;--c-yellow:#d9b92c;--c-green:#46b45a;--c-blue:#3c82e6;--c-purple:#965ad2;--c-gray:#8c8c8c}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--fg:#e8e8ea;--mut:#8e8e93;--line:#333336;--hov:#2a2a2d;--sel:#1f3a6b;--acc:#5b8dff;--err:#ff6b5e;--bar:#232326;--ok:#34c759}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:12px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;-webkit-user-select:none;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+.top{display:flex;gap:4px;align-items:center;padding:8px;border-bottom:1px solid var(--line);background:var(--bar)}
+button{font:inherit;color:var(--fg);background:none;border:1px solid transparent;border-radius:5px;padding:3px 6px;cursor:pointer;line-height:1.2}
+button:hover:not(:disabled){background:var(--hov);border-color:var(--line)}
+input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:100%;outline:none;-webkit-user-select:text;user-select:text}
+input::placeholder{color:var(--mut);opacity:.75}
+input:focus,select:focus{border-color:var(--acc)}
+input[type=checkbox]{width:auto}
+#list{flex:1;overflow:auto;padding:2px 0 8px}
+.grp{display:flex;align-items:center;gap:4px;padding:6px 8px 3px;color:var(--mut);font-weight:600;font-size:11px;cursor:default;text-transform:none}
+.grp:hover{color:var(--fg)}
+.grp .tw{width:10px;display:inline-block;text-align:center;font-size:9px}
+.grp .n{font-weight:400}
+.row{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 20px;cursor:default;white-space:nowrap;border-left:3px solid transparent}
+.row:hover{background:var(--hov)}
+.row.sel{background:var(--sel)}
+.row .cd{width:8px;height:8px;border-radius:50%;flex:none;background:transparent;border:1px solid var(--line)}
+.row .tx{flex:1;min-width:0}
+.row .nm{overflow:hidden;text-overflow:ellipsis}
+.row .sub{color:var(--mut);font-size:10.5px;overflow:hidden;text-overflow:ellipsis}
+.row.missing .nm{text-decoration:line-through;color:var(--mut)}
+.badge{background:var(--ok);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;font-weight:600;flex:none}
+.src{color:var(--mut);font-size:10px;flex:none}
+.empty{color:var(--mut);padding:24px 14px;text-align:center;line-height:1.6}
+.status{padding:4px 10px 6px;color:var(--mut);background:var(--bar);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err{color:var(--err)}
+.menu{position:fixed;display:none;background:var(--bg);border:1px solid var(--line);border-radius:7px;box-shadow:0 6px 24px rgba(0,0,0,.22);padding:4px;z-index:20;min-width:190px}
+.menu div{padding:4px 10px;border-radius:4px;cursor:default;white-space:nowrap}
+.menu div:hover,.menu div.act{background:var(--acc);color:#fff}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.menu .danger{color:var(--err)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:flex-start;justify-content:center;padding-top:30px;z-index:9}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;width:calc(100% - 16px);max-width:360px;box-shadow:0 8px 30px rgba(0,0,0,.2);max-height:calc(100% - 40px);overflow:auto}
+.box p{margin:0 0 8px;white-space:pre-wrap;word-break:break-word}
+.box h3{margin:0 0 8px;font-size:13px}
+.btns{display:flex;justify-content:flex-end;gap:6px;margin-top:10px}
+.ok{background:var(--acc)!important;color:#fff}
+.ok.danger{background:var(--err)!important}
+.f{margin-bottom:6px}
+.f label{display:block;color:var(--mut);font-size:11px;margin-bottom:2px}
+.f .hint{color:var(--mut);font-size:10.5px;margin-top:2px}
+.two{display:flex;gap:6px}.two .f{flex:1}.two .f.sm{flex:0 0 70px}
+.colors{display:flex;gap:5px;flex-wrap:wrap}
+.colors span{width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.colors span.on{border-color:var(--fg)}
+.colors span[data-c=""]{background:var(--bg);border:1px dashed var(--mut)}
+.colors span[data-c=""].on{border-style:solid;border-color:var(--fg)}
+.chk{display:flex;gap:5px;align-items:center;margin:4px 0;color:var(--fg)}
+.err{color:var(--err)}
+details summary{cursor:pointer;color:var(--mut);margin:4px 0}
+</style></head>
+<body><div id="app">
+ <div class="top">
+  <input type="text" id="q" placeholder="Tìm kênh (⌘F)" spellcheck="false">
+  <button id="bAdd" title="Thêm kênh">＋</button>
+  <button id="bSync" title="Đồng bộ lại từ ~/.ssh/config">⟳</button>
+ </div>
+ <div id="list"><div class="empty">Đang tải…</div></div>
+ <div class="status" id="status">&nbsp;</div>
+</div>
+<div class="menu" id="menu"></div>
+<div class="modal" id="modal"><div class="box"><p id="mMsg"></p>
+ <div class="btns"><button id="mCancel">Huỷ</button><button class="ok" id="mOk">OK</button></div></div></div>
+<div class="modal" id="form"><div class="box">
+ <h3 id="fTitle">Thêm kênh</h3>
+ <div class="f"><label>Tên hiển thị</label><input id="f_name" placeholder="vd. Web prod 1"></div>
+ <div class="f"><label>Nhóm</label><input id="f_group" list="groups" placeholder="vd. Production"><datalist id="groups"></datalist></div>
+ <div class="two"><div class="f"><label>Host *</label><input id="f_host" placeholder="hostname, IP hoặc alias" spellcheck="false"></div>
+  <div class="f sm"><label>Port</label><input id="f_port" placeholder="22" inputmode="numeric"></div></div>
+ <div class="hint" id="hostHint" style="display:none;color:var(--mut);font-size:10.5px;margin:-3px 0 6px">Kênh lấy từ ~/.ssh/config: host là alias, ssh tự đọc HostName/Port/User từ config.</div>
+ <div class="f"><label>User</label><input id="f_user" spellcheck="false"></div>
+ <div class="f"><label>Màu</label><div class="colors" id="colors"></div></div>
+ <details id="adv"><summary>Nâng cao</summary>
+  <div class="f"><label>Identity file (key)</label><input id="f_identity_file" placeholder="~/.ssh/id_ed25519" spellcheck="false"></div>
+  <div class="f"><label>ProxyJump</label><input id="f_proxy_jump" placeholder="bastion hoặc user@bastion:22" spellcheck="false"></div>
+  <div class="f"><label>Tham số ssh thêm</label><input id="f_extra_args" placeholder="-L 8080:localhost:80 -A" spellcheck="false"></div>
+  <div class="f"><label>Thư mục mở sẵn</label><input id="f_remote_dir" placeholder="/var/www hoặc ~/app" spellcheck="false"></div>
+  <div class="f"><label>Tag (phân tách bằng dấu phẩy)</label><input id="f_tags" placeholder="prod, web"></div>
+  <div id="kcBox">
+   <label class="chk"><input type="checkbox" id="f_keychain"> Lưu mật khẩu trong Keychain</label>
+   <div class="f" id="pwRow"><input type="password" id="f_password" placeholder="mật khẩu (để trống = giữ nguyên)" autocomplete="off">
+    <div class="hint" id="pwHint"></div></div>
+   <label class="chk" id="atRow"><input type="checkbox" id="f_autotype_password"> Tự gõ mật khẩu khi terminal hỏi</label>
+  </div>
+ </details>
+ <div class="f"><label>Lệnh</label><input id="f_cmd" readonly tabindex="-1" style="color:var(--mut)"></div>
+ <div class="err" id="fErr"></div>
+ <div class="btns"><button id="fCancel">Huỷ</button><button class="ok" id="fSave">Lưu</button></div>
+</div></div>
+<script>
+const T = new URLSearchParams(location.search).get('t');
+const $ = id => document.getElementById(id);
+const COLORS = ['', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
+let data = {sessions: [], settings: {collapsed_groups: []}}, lastJson = '', collapsed = new Set(), selId = null, editing = null, keychainOn = false;
+
+async function api(path, opts = {}) {
+  const o = {method: opts.method || 'GET', headers: {'X-Token': T}};
+  if (opts.json !== undefined) { o.method = opts.method || 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(opts.json); }
+  const r = await fetch(path, o);
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) { const e = new Error(d.error || ('HTTP ' + r.status)); e.code = d.code; throw e; }
+  return d;
+}
+function setStatus(m, err) { const s = $('status'); s.textContent = m || ' '; s.className = 'status' + (err ? ' err' : ''); }
+const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const groupOf = c => c.group || 'Chưa phân nhóm';
+function sub(c) {
+  const r = c.resolved || {};
+  const user = c.user || r.user, port = c.port || r.port;
+  let host = c.host;
+  if (r.hostname && r.hostname !== c.host) host = r.hostname;
+  let s = (user ? user + '@' : '') + host + (port && port !== 22 ? ':' + port : '');
+  if (c.missing) s += ' — không còn trong ~/.ssh/config';
+  else if (c.tags && c.tags.length) s += '  ·  ' + c.tags.join(', ');
+  return s;
+}
+
+function modal(msg, {ok = 'OK', danger = false} = {}) {
+  return new Promise(res => {
+    $('mMsg').textContent = msg; $('mOk').textContent = ok; $('mOk').className = 'ok' + (danger ? ' danger' : '');
+    $('modal').style.display = 'flex'; setTimeout(() => $('mOk').focus(), 0);
+    const done = v => { $('modal').style.display = 'none'; $('mOk').onclick = $('mCancel').onclick = $('modal').onkeydown = null; res(v); };
+    $('mOk').onclick = () => done(true); $('mCancel').onclick = () => done(false);
+    $('modal').onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+  });
+}
+
+function filtered() {
+  const q = norm($('q').value.trim());
+  if (!q) return data.sessions;
+  return data.sessions.filter(c => [c.name, c.host, c.user, c.group, ...(c.tags || [])].some(x => norm(x).includes(q)));
+}
+
+function visibleRows() { return [...document.querySelectorAll('#list .row')]; }
+
+function render() {
+  const list = $('list'); const st = list.scrollTop; list.innerHTML = '';
+  const items = filtered(); const searching = !!$('q').value.trim();
+  if (!data.sessions.length) { list.innerHTML = '<div class="empty">Chưa có kênh nào.<br>Bấm ＋ để thêm, hoặc thêm Host vào ~/.ssh/config.</div>'; return; }
+  if (!items.length) { list.innerHTML = '<div class="empty">Không có kênh khớp.</div>'; return; }
+  const groups = new Map();
+  items.forEach(c => { const g = groupOf(c); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(c); });
+  // Nhóm người dùng đặt trước, rồi nhóm import ~/.ssh/config, cuối cùng là chưa phân nhóm.
+  const rank = g => g === 'Chưa phân nhóm' ? 2 : g === '~/.ssh/config' ? 1 : 0;
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'vi', {numeric: true}));
+  for (const g of names) {
+    const chs = groups.get(g).sort((a, b) => a.name.localeCompare(b.name, 'vi', {numeric: true}));
+    const closed = collapsed.has(g) && !searching;
+    const h = document.createElement('div'); h.className = 'grp';
+    h.innerHTML = '<span class="tw"></span><span class="g"></span><span class="n"></span>';
+    h.children[0].textContent = closed ? '▶' : '▼'; h.children[1].textContent = g;
+    const openN = chs.reduce((s, c) => s + (c.open ? 1 : 0), 0);
+    h.children[2].textContent = '(' + chs.length + (openN ? ', ' + openN + ' đang mở' : '') + ')';
+    h.onclick = () => { collapsed.has(g) ? collapsed.delete(g) : collapsed.add(g); api('/api/ui', {json: {collapsed_groups: [...collapsed]}}).catch(() => {}); render(); };
+    list.appendChild(h);
+    if (closed) continue;
+    for (const c of chs) {
+      const r = document.createElement('div');
+      r.className = 'row' + (c.id === selId ? ' sel' : '') + (c.missing ? ' missing' : '');
+      r.dataset.id = c.id; r.title = c.command;
+      r.innerHTML = '<span class="cd"></span><div class="tx"><div class="nm"></div><div class="sub"></div></div>';
+      if (c.color) { r.firstChild.style.background = 'var(--c-' + c.color + ')'; r.firstChild.style.borderColor = 'transparent'; r.style.borderLeftColor = 'var(--c-' + c.color + ')'; }
+      r.querySelector('.nm').textContent = c.name; r.querySelector('.sub').textContent = sub(c);
+      if (c.source === 'ssh_config') { const s = document.createElement('span'); s.className = 'src'; s.textContent = '⚙'; s.title = 'Từ ~/.ssh/config'; r.appendChild(s); }
+      if (c.open) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = c.open > 1 ? '● ' + c.open : '●'; b.title = 'Đang mở trong ' + c.open + ' tab'; r.appendChild(b); }
+      r.onclick = () => { select(c.id); openCh(c, 'tab'); };
+      r.oncontextmenu = e => { e.preventDefault(); select(c.id); showMenu(c, e.clientX, e.clientY); };
+      list.appendChild(r);
+    }
+  }
+  list.scrollTop = st;
+  const groupsDl = $('groups'); groupsDl.innerHTML = '';
+  [...new Set(data.sessions.map(c => c.group).filter(Boolean))].sort().forEach(g => { const o = document.createElement('option'); o.value = g; groupsDl.appendChild(o); });
+}
+
+function select(id) {
+  selId = id;
+  visibleRows().forEach(r => r.classList.toggle('sel', r.dataset.id === id));
+  const r = visibleRows().find(r => r.dataset.id === id); if (r) r.scrollIntoView({block: 'nearest'});
+}
+
+async function refresh() {
+  try {
+    const d = await api('/api/sessions');
+    const j = JSON.stringify(d.sessions);
+    keychainOn = !!d.settings.keychain_enabled;
+    if (!lastJson) collapsed = new Set(d.settings.collapsed_groups || []);
+    if (j !== lastJson) { lastJson = j; data = d; render(); }
+    const errs = (d.ssh_config && d.ssh_config.errors) || [];
+    if (errs.length && $('status').textContent.trim() === '') setStatus('~/.ssh/config: ' + errs[0], true);
+  } catch (e) { setStatus('Lỗi: ' + e.message, true); }
+}
+
+async function openCh(c, mode) {
+  if (c.missing) { setStatus('Alias "' + c.host + '" không còn trong ~/.ssh/config', true); return; }
+  try { setStatus('Đang mở ' + c.name + '…'); await api('/api/sessions/' + c.id + '/open', {json: {mode}}); setStatus('Đã mở ' + c.name); lastJson = ''; setTimeout(refresh, 700); }
+  catch (e) { setStatus('Lỗi: ' + e.message, true); }
+}
+
+function copyText(s) {
+  const ta = document.createElement('textarea'); ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+  ta.remove();
+  if (!ok && navigator.clipboard) navigator.clipboard.writeText(s).then(() => setStatus('Đã copy lệnh ssh'), () => setStatus('Không copy được', true));
+  else setStatus(ok ? 'Đã copy: ' + s : 'Không copy được', !ok);
+}
+
+// ---- menu chuột phải (tự vẽ)
+let menuItems = [], menuIdx = -1;
+function showMenu(c, x, y) {
+  const m = $('menu'); m.innerHTML = ''; menuItems = []; menuIdx = -1;
+  const add = (label, fn, cls) => { const d = document.createElement('div'); d.textContent = label; if (cls) d.className = cls; d.onclick = () => { hideMenu(); fn(); }; m.appendChild(d); menuItems.push(d); };
+  const sep = () => m.appendChild(document.createElement('hr'));
+  add('Mở trong tab mới', () => openCh(c, 'tab'));
+  add('Mở ở split dọc', () => openCh(c, 'vsplit'));
+  add('Mở ở split ngang', () => openCh(c, 'hsplit'));
+  add('Mở ở tab hiện tại', () => openCh(c, 'current'));
+  if (c.open_sessions && c.open_sessions.length) add('Chuyển tới tab đang mở', () => api('/api/sessions/focus', {json: {session_id: c.open_sessions[0]}}).catch(e => setStatus('Lỗi: ' + e.message, true)));
+  sep();
+  add('Sửa…', () => openForm(c));
+  add('Nhân bản', async () => { try { const n = await api('/api/sessions/' + c.id + '/duplicate', {json: {}}); lastJson = ''; await refresh(); select(n.id); openForm(data.sessions.find(x => x.id === n.id) || n); } catch (e) { setStatus('Lỗi: ' + e.message, true); } });
+  add('Copy lệnh ssh', () => copyText(c.command));
+  sep();
+  add('Xoá', () => delCh(c), 'danger');
+  m.style.display = 'block';
+  const W = innerWidth, H = innerHeight, r = m.getBoundingClientRect();
+  m.style.left = Math.max(2, Math.min(x, W - r.width - 4)) + 'px';
+  m.style.top = Math.max(2, Math.min(y, H - r.height - 4)) + 'px';
+}
+function hideMenu() { $('menu').style.display = 'none'; menuItems = []; }
+document.addEventListener('mousedown', e => { if (!$('menu').contains(e.target)) hideMenu(); });
+window.addEventListener('blur', hideMenu);
+
+async function delCh(c) {
+  const extra = c.source === 'ssh_config' && !c.missing ? '\n\nKênh này lấy từ ~/.ssh/config: nếu alias còn trong config, lần đồng bộ sau sẽ thêm lại.' : '';
+  if (!await modal('Xoá kênh "' + c.name + '"?' + extra, {ok: 'Xoá', danger: true})) return;
+  try { await api('/api/sessions/' + c.id, {method: 'DELETE', json: {}}); setStatus('Đã xoá ' + c.name); lastJson = ''; refresh(); }
+  catch (e) { setStatus('Lỗi: ' + e.message, true); }
+}
+
+// ---- form thêm/sửa
+const FIELDS = ['name', 'group', 'host', 'port', 'user', 'identity_file', 'proxy_jump', 'extra_args', 'remote_dir', 'tags'];
+let formColor = '';
+function drawColors() {
+  const box = $('colors'); box.innerHTML = '';
+  COLORS.forEach(c => { const s = document.createElement('span'); s.dataset.c = c; if (c) s.style.background = 'var(--c-' + c + ')'; s.title = c || 'không màu'; s.className = c === formColor ? 'on' : ''; s.onclick = () => { formColor = c; drawColors(); }; box.appendChild(s); });
+}
+function shq(s) { return /^[A-Za-z0-9_@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\"'\"'") + "'"; }
+function previewCmd() {
+  const g = k => $('f_' + k).value.trim();
+  const a = ['ssh']; const p = g('port');
+  if (p && p !== '22') a.push('-p', p);
+  if (g('identity_file')) a.push('-i', g('identity_file'));
+  if (g('proxy_jump')) a.push('-J', g('proxy_jump'));
+  let cmd = a.map(shq).join(' ');
+  if (g('extra_args')) cmd += ' ' + g('extra_args');
+  if (g('remote_dir')) cmd += ' -t';
+  cmd += ' ' + shq((g('user') ? g('user') + '@' : '') + (g('host') || 'host'));
+  if (g('remote_dir')) cmd += ' ' + shq('cd ' + g('remote_dir') + ' && exec $SHELL -l');
+  $('f_cmd').value = cmd;
+}
+async function openForm(c) {
+  hideMenu(); editing = c || null;
+  $('fTitle').textContent = c ? 'Sửa kênh' : 'Thêm kênh';
+  FIELDS.forEach(k => { let v = c ? c[k] : ''; if (k === 'tags') v = (v || []).join(', '); $('f_' + k).value = v == null ? '' : v; });
+  if (!c) { const g = selId && data.sessions.find(x => x.id === selId); if (g && g.group) $('f_group').value = g.group; }
+  const fromCfg = !!(c && c.source === 'ssh_config');
+  $('f_host').readOnly = fromCfg; $('hostHint').style.display = fromCfg ? '' : 'none';
+  formColor = (c && c.color) || ''; drawColors();
+  $('f_keychain').checked = !!(c && c.keychain); $('f_autotype_password').checked = !!(c && c.autotype_password);
+  $('f_password').value = ''; $('pwHint').textContent = '';
+  $('kcBox').style.display = keychainOn ? '' : 'none';
+  syncKc();
+  $('adv').open = !!(c && (c.identity_file || c.proxy_jump || c.extra_args || c.remote_dir || (c.tags && c.tags.length) || c.keychain));
+  $('fErr').textContent = ''; previewCmd();
+  $('form').style.display = 'flex';
+  setTimeout(() => (fromCfg ? $('f_name') : (c ? $('f_name') : $('f_host'))).focus(), 0);
+  if (c && c.keychain) { try { const d = await api('/api/sessions/' + c.id + '/password'); $('pwHint').textContent = d.has_password ? 'Đã có mật khẩu trong Keychain.' : 'Chưa có mật khẩu.'; } catch (_) {} }
+}
+function syncKc() { const on = $('f_keychain').checked; $('pwRow').style.display = on ? '' : 'none'; $('atRow').style.display = on ? '' : 'none'; }
+$('f_keychain').onchange = syncKc;
+function closeForm() { $('form').style.display = 'none'; editing = null; }
+async function saveForm() {
+  const d = {}; FIELDS.forEach(k => d[k] = $('f_' + k).value.trim());
+  d.color = formColor; d.keychain = $('f_keychain').checked; d.autotype_password = $('f_autotype_password').checked;
+  if ($('f_password').value) d.password = $('f_password').value;
+  if (!d.host) { $('fErr').textContent = 'Cần nhập host'; $('f_host').focus(); return; }
+  try {
+    const r = editing ? await api('/api/sessions/' + editing.id, {method: 'PUT', json: d}) : await api('/api/sessions', {json: d});
+    closeForm(); setStatus('Đã lưu ' + r.name); lastJson = ''; await refresh(); select(r.id);
+  } catch (e) { $('fErr').textContent = e.message; }
+}
+$('fCancel').onclick = closeForm; $('fSave').onclick = saveForm;
+$('form').addEventListener('input', previewCmd);
+$('form').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeForm(); } else if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') { e.preventDefault(); saveForm(); } });
+
+// ---- thanh trên
+$('bAdd').onclick = () => openForm(null);
+$('bSync').onclick = async () => {
+  try { const r = await api('/api/sessions/sync', {json: {}}); const parts = [];
+    if (r.added.length) parts.push('thêm ' + r.added.length); if (r.missing.length) parts.push(r.missing.length + ' biến mất'); if (r.restored.length) parts.push('khôi phục ' + r.restored.length);
+    setStatus('Đồng bộ ~/.ssh/config: ' + (parts.join(', ') || 'không có thay đổi')); lastJson = ''; refresh();
+  } catch (e) { setStatus('Lỗi: ' + e.message, true); }
+};
+$('q').addEventListener('input', () => { render(); const r = visibleRows()[0]; if (r) select(r.dataset.id); });
+window.xshellFocusSearch = () => { $('q').focus(); $('q').select(); };
+
+// ---- bàn phím
+document.addEventListener('keydown', e => {
+  if ($('form').style.display === 'flex' || $('modal').style.display === 'flex') return;
+  if ($('menu').style.display === 'block') {
+    if (e.key === 'Escape') { hideMenu(); e.preventDefault(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); menuIdx = (menuIdx + (e.key === 'ArrowDown' ? 1 : -1) + menuItems.length) % menuItems.length; menuItems.forEach((d, i) => d.classList.toggle('act', i === menuIdx)); }
+    else if (e.key === 'Enter' && menuIdx >= 0) { e.preventDefault(); menuItems[menuIdx].click(); }
+    return;
+  }
+  if (e.metaKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); window.xshellFocusSearch(); return; }
+  if (e.metaKey && e.key === 'n') { e.preventDefault(); openForm(null); return; }
+  const rows = visibleRows(); const i = rows.findIndex(r => r.dataset.id === selId);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (!rows.length) return;
+    const j = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    select(rows[j].dataset.id); if (document.activeElement === $('q') && e.key === 'ArrowDown') $('q').blur();
+  } else if (e.key === 'Enter' && selId) {
+    e.preventDefault(); const c = data.sessions.find(x => x.id === selId); if (c) openCh(c, e.shiftKey ? 'vsplit' : 'tab');
+  } else if (e.key === 'Escape' && document.activeElement === $('q')) { $('q').value = ''; render(); $('q').blur(); }
+  else if ((e.key === 'Backspace' || e.key === 'Delete') && selId && document.activeElement !== $('q')) { const c = data.sessions.find(x => x.id === selId); if (c) delCh(c); }
+  else if (e.key === 'ContextMenu' && selId) { const r = rows[i]; const c = data.sessions.find(x => x.id === selId); if (r && c) { const b = r.getBoundingClientRect(); showMenu(c, b.left + 20, b.bottom); } }
+});
+
+refresh(); setInterval(refresh, 2000);
+</script></body></html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xshell</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--mut:#86868b;--line:#e3e3e0;--bar:#f3f3f1;--acc:#2f6fed}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--fg:#e8e8ea;--mut:#8e8e93;--line:#333336;--bar:#232326;--acc:#5b8dff}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:12px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;-webkit-user-select:none;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+.tabs{display:flex;background:var(--bar);border-bottom:1px solid var(--line)}
+.tabs button{flex:1;font:inherit;font-weight:500;color:var(--mut);background:none;border:0;border-bottom:2px solid transparent;padding:7px 4px;cursor:pointer}
+.tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
+.tabs button:hover{color:var(--fg)}
+iframe{flex:1;width:100%;border:0;display:none;background:var(--bg)}
+iframe.on{display:block}
+</style></head>
+<body><div id="app">
+ <div class="tabs"><button id="tSsh" data-m="ssh">Kênh SSH</button><button id="tFtp" data-m="ftp">Xftp</button></div>
+ <iframe id="fSsh" title="Kênh SSH"></iframe>
+ <iframe id="fFtp" title="Xftp"></iframe>
+</div>
+<script>
+const T = new URLSearchParams(location.search).get('t') || '';
+const $ = id => document.getElementById(id);
+const frames = {ssh: $('fSsh'), ftp: $('fFtp')}, tabs = {ssh: $('tSsh'), ftp: $('tFtp')};
+frames.ssh.src = '/sessions?where=window&t=' + encodeURIComponent(T);
+frames.ftp.src = '/files?t=' + encodeURIComponent(T);
+let mode = 'ssh';
+try { if (localStorage.getItem('xshell.mode') === 'ftp') mode = 'ftp'; } catch (e) {}
+function setMode(m) {
+  mode = m;
+  for (const k in frames) { frames[k].classList.toggle('on', k === m); tabs[k].classList.toggle('on', k === m); }
+  try { localStorage.setItem('xshell.mode', m); } catch (e) {}
+}
+for (const k in tabs) tabs[k].onclick = () => setMode(k);
+// ⌘1 / ⌘2 đổi tab
+document.addEventListener('keydown', e => {
+  if (e.metaKey && e.key === '1') { e.preventDefault(); setMode('ssh'); }
+  if (e.metaKey && e.key === '2') { e.preventDefault(); setMode('ftp'); }
+});
+window.xshellFocusSearch = () => {
+  setMode('ssh');
+  try { frames.ssh.contentWindow.xshellFocusSearch(); } catch (e) {}
+};
+setMode(mode);
+</script></body></html>
