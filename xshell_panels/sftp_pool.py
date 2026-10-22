@@ -149,6 +149,20 @@ class Pool:
             self._entries[k] = e
             return e.sftp
 
+    async def exec(self, t: Target, cmd: str, timeout: float = 10) -> str:
+        """Chạy 1 lệnh trên kết nối SFTP đang có. Không tự nối lại và không làm mới thời điểm
+        'used' để việc thăm dò định kỳ không giữ kết nối sống mãi hay gây hỏi mật khẩu."""
+        e = self._entries.get(t.key)
+        if not e or not e.alive():
+            raise ApiError(409, "Chưa kết nối tới server", "notconnected")
+        try:
+            r = await asyncio.wait_for(e.conns[-1].run(cmd, check=False), timeout)
+        except asyncio.TimeoutError:
+            raise ApiError(504, "Server phản hồi chậm", "timeout")
+        except LOST:
+            raise ApiError(502, "Mất kết nối tới server", "lost")
+        return r.stdout if isinstance(r.stdout, str) else (r.stdout or b"").decode("utf-8", "replace")
+
     async def run(self, t: Target, fn):
         """Chạy fn(sftp); nếu kết nối cũ đã chết thì nối lại và thử thêm 1 lần."""
         for attempt in (0, 1):

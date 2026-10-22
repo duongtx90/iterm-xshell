@@ -68,6 +68,17 @@ input:focus{border-color:var(--acc)}
 #viewer .vh{display:flex;gap:6px;align-items:center;margin-bottom:6px}
 #viewer .vh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 label.chk{display:flex;gap:4px;align-items:center;color:var(--mut);cursor:pointer}
+#hw{display:none;gap:10px;align-items:center;padding:3px 10px 4px;border-top:1px solid var(--line);background:var(--bar);color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+#hw.on{display:flex}
+#hw .m{display:flex;gap:4px;align-items:center;min-width:0}
+#hw .m i{display:block;width:26px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+#hw .m i u{display:block;height:100%;background:#34c759;text-decoration:none}
+#hw .m.mid i u{background:#ff9f0a}
+#hw .m.hi{color:var(--err);font-weight:600}
+#hw .m.hi i u{background:var(--err)}
+#hw .warn{color:var(--err);font-weight:600;margin-left:auto;display:none}
+#hw.alert{background:color-mix(in srgb,var(--err) 12%,var(--bar))}
+#hw.alert .warn{display:inline}
 .chan{font-size:10px;padding:0 5px;border-radius:8px;background:var(--hov);color:var(--mut);flex:none}
 </style></head>
 <body><div id="app">
@@ -96,6 +107,7 @@ label.chk{display:flex;gap:4px;align-items:center;color:var(--mut);cursor:pointe
   <label class="chk" title="Hiện file ẩn"><input type="checkbox" id="hidden" checked> ẩn</label>
  </div>
  <div id="jobs"></div>
+ <div id="hw"></div>
  <div class="status" id="status"><span id="statusText">&nbsp;</span><button id="bCancel" title="Huỷ upload">✕ Huỷ</button></div>
 </div>
 <input type="file" id="picker" multiple hidden>
@@ -428,5 +440,50 @@ document.addEventListener('keydown', e => {
   else if (e.metaKey && e.key === 'l') { e.preventDefault(); $('path').focus(); $('path').select(); }
 });
 
-render(); poll(); setInterval(poll, 1500); pollJobs();
+// ---- thông số phần cứng server: thăm dò thưa (30s), chỉ khi panel đang hiện
+const HW_EVERY = 30000;
+let hwTimer = null, hwKey = null;
+const hwLabel = {cpu: 'CPU', mem: 'RAM', disk: 'Ổ đĩa', load: 'Load'};
+function hwClear() { $('hw').className = ''; $('hw').innerHTML = ''; }
+function hwRender(d) {
+  const hw = $('hw');
+  const metric = (k, pct, text, tip) => {
+    const lvl = pct >= 90 ? 'hi' : pct >= 75 ? 'mid' : '';
+    const m = document.createElement('span');
+    m.className = 'm ' + lvl; m.title = tip || '';
+    const i = document.createElement('i'), u = document.createElement('u');
+    u.style.width = Math.min(100, Math.max(0, pct)) + '%'; i.appendChild(u);
+    m.append(hwLabel[k] + ' ' + text, i);
+    return m;
+  };
+  hw.innerHTML = '';
+  if (d.cpu !== null) hw.appendChild(metric('cpu', d.cpu, Math.round(d.cpu) + '%', d.cores ? d.cores + ' nhân' : ''));
+  if (d.mem) hw.appendChild(metric('mem', d.mem.pct, Math.round(d.mem.pct) + '%', fmtSize(d.mem.used) + ' / ' + fmtSize(d.mem.total)));
+  if (d.disk) hw.appendChild(metric('disk', d.disk.pct, Math.round(d.disk.pct) + '%', d.disk.mount + ': ' + fmtSize(d.disk.used) + ' / ' + fmtSize(d.disk.total)));
+  if (d.load && !hw.children.length) {
+    const m = document.createElement('span'); m.className = 'm'; m.textContent = 'Load ' + d.load[0].toFixed(2); hw.appendChild(m);
+  }
+  const w = document.createElement('span'); w.className = 'warn';
+  w.textContent = '⚠ Quá tải';
+  w.title = d.alerts.map(a => hwLabel[a]).join(', ') + (d.load ? '\nLoad ' + d.load.map(x => x.toFixed(2)).join(' ') + (d.cores ? ' / ' + d.cores + ' nhân' : '') : '');
+  hw.appendChild(w);
+  hw.className = (hw.children.length > 1 ? 'on' : '') + (d.alerts.length ? ' alert' : '');
+}
+async function hwPoll() {
+  clearTimeout(hwTimer); hwTimer = null;
+  if (!target || document.hidden) { if (!target) hwClear(); return hwSchedule(); }
+  const key = JSON.stringify(target);
+  if (key !== hwKey) { hwKey = key; hwClear(); }
+  let d = null;
+  try { d = await api('/api/stats?' + tq() + '&path=' + enc(cwd || '')); } catch (e) { /* im lặng: không làm phiền việc duyệt file */ }
+  if (d && key === hwKey) {
+    hwRender(d);
+    if (d.cpu === null && d.mem) { hwTimer = setTimeout(hwPoll, 3000); return; }  // mẫu đầu: lấy mẫu thứ 2 sớm để có % CPU
+  }
+  hwSchedule();
+}
+function hwSchedule() { clearTimeout(hwTimer); hwTimer = setTimeout(hwPoll, HW_EVERY); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { clearTimeout(hwTimer); hwTimer = setTimeout(hwPoll, 500); } });
+
+render(); poll(); setInterval(poll, 1500); pollJobs(); hwTimer = setTimeout(hwPoll, 2500);
 </script></body></html>

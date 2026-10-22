@@ -18,6 +18,7 @@ from aiohttp import web
 
 from . import ApiError
 from .sessions_store import SessionStore, ValidationError
+from .server_stats import build_command, parse as parse_stats
 from .sftp_pool import Pool
 from .ssh_parse import build_ssh_command, ssh_G, target_for_channel, target_from
 
@@ -190,6 +191,16 @@ def make_app(*, ctx, store: SessionStore, token: str, pool: Pool | None = None,
     # ============================================================ files
     async def context(_):
         return web.json_response(await ctx.current())
+
+    cpu_prev: dict = {}
+
+    async def stats(req):
+        t = target_of(req.query)
+        out = await pool.exec(t, build_command(req.query.get("path") or None))
+        res, cur = parse_stats(out, cpu_prev.get(t.key))
+        if cur:
+            cpu_prev[t.key] = cur
+        return web.json_response(res)
 
     async def list_dir(req):
         t = target_of(req.query)
@@ -587,6 +598,7 @@ def make_app(*, ctx, store: SessionStore, token: str, pool: Pool | None = None,
         web.get("/panel", page("combo.html")),
         web.get("/api/context", context),
         web.get("/api/list", list_dir),
+        web.get("/api/stats", stats),
         web.get("/api/view", view),
         web.post("/api/password", password),
         web.post("/api/upload", upload),
