@@ -33,8 +33,6 @@ summary .rf{font-weight:400;color:var(--mut);padding:0 5px}
 .m u{display:block;height:100%;background:var(--ok);text-decoration:none}
 .m.mid u{background:var(--mid)}.m.hi u{background:var(--err)}.m.hi .v{color:var(--err);font-weight:600}
 .m .v{flex:none;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.spark{display:block;width:100%;height:26px;margin:2px 0 6px}
-.spark polyline{fill:none;stroke:var(--acc);stroke-width:1.4}
 .seg{display:flex;gap:2px;margin-bottom:6px}
 .seg button{border-color:var(--line);padding:1px 8px}.seg button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 table{border-collapse:collapse;width:100%}
@@ -75,9 +73,9 @@ pre{margin:0;padding:6px;border:1px solid var(--line);border-radius:5px;font:11p
 const T = new URLSearchParams(location.search).get('t');
 const $ = id => document.getElementById(id);
 const enc = encodeURIComponent;
-const USAGE_EVERY = 15000, CTX_EVERY = 3000, HIST = 60;
+const USAGE_EVERY = 15000, CTX_EVERY = 3000;
 let target = null, channel = null, active = !document.hidden && window.parent === window;
-let usageTimer = null, ctxTimer = null, hist = {cpu: [], mem: []}, loaded = {}, askingPw = false;
+let usageTimer = null, ctxTimer = null, loaded = {}, askingPw = false;
 
 async function api(path, opts = {}) {
   const o = {method: opts.method || 'GET', headers: {'X-Token': T}};
@@ -127,26 +125,15 @@ function metric(name, pct, text, tip) {
   m.append(el('b', '', name), i, el('span', 'v', text));
   return m;
 }
-function spark(vals) {
-  const NS = 'http://www.w3.org/2000/svg', s = document.createElementNS(NS, 'svg');
-  s.setAttribute('class', 'spark'); s.setAttribute('viewBox', '0 0 100 26'); s.setAttribute('preserveAspectRatio', 'none');
-  const p = document.createElementNS(NS, 'polyline');
-  p.setAttribute('points', vals.map((v, i) => (vals.length < 2 ? 0 : i * 100 / (HIST - 1)).toFixed(1) + ',' + (25 - Math.min(100, v) * 24 / 100).toFixed(1)).join(' '));
-  s.appendChild(p); return s;
-}
 const pc = x => Math.round(x) + '%';
 function renderUsage(d) {
   const b = $('b-usage'); b.replaceChildren();
-  if (d.cpu !== null) { hist.cpu.push(d.cpu); hist.cpu = hist.cpu.slice(-HIST); }
-  if (d.mem) { hist.mem.push(d.mem.pct); hist.mem = hist.mem.slice(-HIST); }
   if (d.cpu !== null) {
     b.appendChild(metric('CPU', d.cpu, pc(d.cpu) + (d.cores ? ' của ' + d.cores + ' nhân' : ''), 'Trung bình giữa hai lần đo'));
-    if (hist.cpu.length > 1) b.appendChild(spark(hist.cpu));
   } else if (d.cores) b.appendChild(el('div', 'hint', 'CPU: đang lấy mẫu… (' + d.cores + ' nhân)'));
   if (d.load) b.appendChild(el('div', 'hint', 'Load ' + d.load.map(x => x.toFixed(2)).join(' · ') + ' (1/5/15 phút)'));
   if (d.mem) {
     b.appendChild(metric('RAM', d.mem.pct, pc(d.mem.pct) + ' · ' + fmtSize(d.mem.used) + ' / ' + fmtSize(d.mem.total)));
-    if (hist.mem.length > 1) b.appendChild(spark(hist.mem));
   }
   (d.disks || []).forEach(k => b.appendChild(metric(k.mount.length > 8 ? '…' + k.mount.slice(-7) : k.mount, k.pct, pc(k.pct) + ' · ' + fmtSize(k.used) + ' / ' + fmtSize(k.total), k.dev + ' → ' + k.mount)));
   if (!b.children.length) msg(b, 'Server này không cung cấp /proc (không phải Linux) — chưa đọc được số liệu.');
@@ -236,7 +223,7 @@ async function loadSection(name, force) {
 
 // ---------- Ngữ cảnh (host của tab hiện tại) + bật/tắt theo tab đang hiện
 function setTarget(t, ch) {
-  target = t; channel = ch; loaded = {}; hist = {cpu: [], mem: []};
+  target = t; channel = ch; loaded = {};
   $('empty').hidden = !!t; $('sections').hidden = !t;
   $('host').textContent = t ? t.label : 'Chưa có phiên SSH'; $('dot').classList.toggle('on', !!t);
   ['usage', 'procs', 'firewall', 'access', 'actions'].forEach(n => $('b-' + n).replaceChildren());
