@@ -1,6 +1,6 @@
 """iterm-xshell: panel kênh SSH + panel duyệt file SFTP cho iTerm2 (giống Xshell/Xftp)."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 class ApiError(Exception):
