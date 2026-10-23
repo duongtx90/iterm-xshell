@@ -35,5 +35,13 @@ def test_non_linux_output_degrades():
     assert r["alerts"] == []
 
 
-def test_command_quotes_path():
-    assert "'" in build_command("/a b/it's") and build_command(None).startswith("sh -c ")
+def test_command_wrapped_in_sh():
+    assert build_command().startswith("sh -c ")
+
+
+def test_df_lists_real_disks_only():
+    out = OUT.replace("/dev/sda1 1000000 950000 50000 95% /",
+                      "tmpfs 10 1 9 10% /run\n/dev/sda1 1000000 950000 50000 95% /\n"
+                      "/dev/sdb1 100 10 90 10% /data\n/dev/sdb1 100 10 90 10% /bind")
+    r, _ = parse(out)
+    assert [d["mount"] for d in r["disks"]] == ["/", "/data"] and r["disk"]["mount"] == "/"

@@ -7,15 +7,14 @@ WARN_PCT = 90          # CPU / RAM / ổ đĩa từ mức này trở lên là qu
 WARN_LOAD_PER_CORE = 1.5
 
 
-def build_command(path: str | None) -> str:
+def build_command() -> str:
     """Lệnh chạy trên server; bọc trong sh -c để chạy được dù login shell là fish/csh."""
-    df = f"df -Pk -- {shlex.quote(path)} || df -Pk /" if path else "df -Pk /"
     script = (
         "exec 2>/dev/null; echo '##stat'; head -n1 /proc/stat; "
         "echo '##mem'; grep -E '^(MemTotal|MemAvailable|MemFree|Buffers|Cached):' /proc/meminfo; "
         "echo '##load'; cat /proc/loadavg; "
         "echo '##nproc'; nproc; "
-        f"echo '##df'; {{ {df}; }} | tail -n 1"
+        "echo '##df'; df -Pk | tail -n +2"
     )
     return f"sh -c {shlex.quote(script)}"
 
@@ -82,15 +81,21 @@ def parse(out: str, prev_cpu=None):
         except ValueError:
             pass
 
-    if sec.get("df"):
-        f = sec["df"][-1].split()
+    disks, seen = [], set()
+    for line in sec.get("df", []):
+        f = line.split()
         try:
             size, used = int(f[1]) * 1024, int(f[2]) * 1024
-            if size:
-                res["disk"] = {"used": used, "total": size, "pct": round(used * 100 / size, 1),
-                               "mount": f[-1]}
         except (ValueError, IndexError):
-            pass
+            continue
+        # chỉ ổ thật (/dev/...); bỏ tmpfs/overlay và trùng thiết bị (bind mount)
+        if size and f[0].startswith("/") and f[0] not in seen:
+            seen.add(f[0])
+            disks.append({"dev": f[0], "mount": f[-1], "used": used, "total": size,
+                          "pct": round(used * 100 / size, 1)})
+    res["disks"] = disks
+    if disks:
+        res["disk"] = next((d for d in disks if d["mount"] == "/"), disks[0])
 
     res["alerts"] = alerts(res)
     return res, cur
@@ -102,7 +107,7 @@ def alerts(s: dict) -> list[str]:
         a.append("cpu")
     if s.get("mem") and s["mem"]["pct"] >= WARN_PCT:
         a.append("mem")
-    if s.get("disk") and s["disk"]["pct"] >= WARN_PCT:
+    if any(d["pct"] >= WARN_PCT for d in s.get("disks") or []):
         a.append("disk")
     if s.get("load") and s.get("cores") and s["load"][0] / s["cores"] >= WARN_LOAD_PER_CORE:
         a.append("load")

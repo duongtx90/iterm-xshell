@@ -37,6 +37,18 @@ Logs are in `~/Library/Logs/iterm-xshell.log` (app) and `~/Library/Logs/iterm-xs
 
 Uninstall: `./install.sh --uninstall` keeps your channel list, `--purge` deletes it too.
 
+### Server tab (hardware, firewall, access history)
+
+A third tab, **Server**, in the same panel (⌘3). Nothing is polled until you open it.
+
+- **Resources**: CPU, RAM and every real disk with used/total, load average and a small history sparkline. Refreshed every 15 s while the tab is open; a banner warns when CPU/RAM/disk reaches 90% or load per core reaches 1.5.
+- **Heavy services**: processes grouped by name, sorted by CPU or RAM.
+- **Firewall & open ports**: `ufw` / `firewalld` / `nftables` / `iptables` rules and listening ports (public vs local-only).
+- **Access history**: current logins, `last`, failed logins and recent sshd accepted/failed events.
+- **Actions**: recent `sudo` commands from the journal or `auth.log`.
+
+Everything is read-only and uses a fixed whitelist of commands over the existing SSH connection (no arbitrary command execution). Sections that need root use `sudo -n` when it works without a password; otherwise the tab says some data may be missing. Non-Linux servers only show disks and processes.
+
 ## Usage
 
 ### SSH channels (left window)

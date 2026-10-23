@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Server</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--mut:#86868b;--line:#e3e3e0;--hov:#f0f0ee;--acc:#2f6fed;--err:#c4382c;--bar:#f3f3f1;--ok:#34c759;--mid:#ff9f0a}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--fg:#e8e8ea;--mut:#8e8e93;--line:#333336;--hov:#2a2a2d;--acc:#5b8dff;--err:#ff6b5e;--bar:#232326}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:12px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;-webkit-user-select:none;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+.top{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid var(--line);background:var(--bar)}
+.top b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex:none}.dot.on{background:var(--ok)}
+button{font:inherit;color:var(--fg);background:none;border:1px solid transparent;border-radius:5px;padding:3px 6px;cursor:pointer;line-height:1.2}
+button:hover{background:var(--hov);border-color:var(--line)}
+#main{flex:1;overflow:auto}
+.empty{color:var(--mut);padding:24px 14px;text-align:center;line-height:1.6}
+.alert{display:none;margin:8px;padding:6px 8px;border-radius:6px;background:color-mix(in srgb,var(--err) 14%,var(--bg));color:var(--err);font-weight:600}
+.alert.on{display:block}
+details{border-bottom:1px solid var(--line)}
+summary{display:flex;gap:6px;align-items:center;padding:7px 10px;cursor:pointer;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--mut);width:10px;flex:none}
+details[open]>summary::before{content:"▾"}
+summary .sp{flex:1}
+summary .rf{font-weight:400;color:var(--mut);padding:0 5px}
+.body{padding:2px 10px 10px}
+.hint{color:var(--mut);padding:2px 0}
+.hint.err{color:var(--err)}
+.m{display:flex;gap:6px;align-items:center;margin:3px 0;font-variant-numeric:tabular-nums}
+.m b{width:44px;flex:none;font-weight:500;color:var(--mut)}
+.m i{display:block;flex:1;min-width:24px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.m u{display:block;height:100%;background:var(--ok);text-decoration:none}
+.m.mid u{background:var(--mid)}.m.hi u{background:var(--err)}.m.hi .v{color:var(--err);font-weight:600}
+.m .v{flex:none;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spark{display:block;width:100%;height:26px;margin:2px 0 6px}
+.spark polyline{fill:none;stroke:var(--acc);stroke-width:1.4}
+.seg{display:flex;gap:2px;margin-bottom:6px}
+.seg button{border-color:var(--line);padding:1px 8px}.seg button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+table{border-collapse:collapse;width:100%}
+td,th{padding:2px 4px 2px 0;text-align:left;font-weight:400;vertical-align:top;font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-size:11px}
+td.r,th.r{text-align:right}
+td.n{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+pre{margin:0;padding:6px;border:1px solid var(--line);border-radius:5px;font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;-webkit-user-select:text;user-select:text}
+.sub{color:var(--mut);margin:8px 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.ev{padding:2px 0;border-bottom:1px dashed var(--line);word-break:break-all;-webkit-user-select:text;user-select:text}
+.ev small{color:var(--mut);display:block}
+.ev.bad{color:var(--err)}
+.pill{font-size:10px;padding:0 5px;border-radius:8px;background:var(--hov);color:var(--mut)}
+.pill.warn{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:flex-start;justify-content:center;padding-top:50px;z-index:9}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;width:calc(100% - 24px);max-width:320px}
+.box p{margin:0 0 8px;white-space:pre-wrap}
+.box input{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:100%}
+.box .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:10px}
+.box .ok{background:var(--acc);color:#fff}
+</style></head>
+<body><div id="app">
+ <div class="top"><span class="dot" id="dot"></span><b id="host">Chưa có phiên SSH</b><button id="bAll" title="Tải lại tất cả mục đang mở">⟳</button></div>
+ <div id="main">
+  <div class="empty" id="empty">Mở một tab đang <b>ssh</b> vào server<br>để xem thông tin phần cứng, firewall, lịch sử truy cập…</div>
+  <div id="sections" hidden>
+   <div class="alert" id="alert"></div>
+   <details id="s-usage" open><summary>Tài nguyên <span class="sp"></span><span class="pill" id="uptag"></span></summary><div class="body" id="b-usage"></div></details>
+   <details id="s-procs"><summary>Dịch vụ ngốn tài nguyên <span class="sp"></span><button class="rf" data-r="procs">⟳</button></summary><div class="body" id="b-procs"></div></details>
+   <details id="s-firewall"><summary>Firewall &amp; cổng mở <span class="sp"></span><button class="rf" data-r="firewall">⟳</button></summary><div class="body" id="b-firewall"></div></details>
+   <details id="s-access"><summary>Lịch sử truy cập <span class="sp"></span><button class="rf" data-r="access">⟳</button></summary><div class="body" id="b-access"></div></details>
+   <details id="s-actions"><summary>Thao tác trên server (sudo) <span class="sp"></span><button class="rf" data-r="actions">⟳</button></summary><div class="body" id="b-actions"></div></details>
+  </div>
+ </div>
+</div>
+<div class="modal" id="modal"><div class="box"><p id="mMsg"></p><input type="password" id="mInput"><div class="btns"><button id="mCancel">Huỷ</button><button class="ok" id="mOk">Kết nối</button></div></div></div>
+<script>
+const T = new URLSearchParams(location.search).get('t');
+const $ = id => document.getElementById(id);
+const enc = encodeURIComponent;
+const USAGE_EVERY = 15000, CTX_EVERY = 3000, HIST = 60;
+let target = null, channel = null, active = !document.hidden && window.parent === window;
+let usageTimer = null, ctxTimer = null, hist = {cpu: [], mem: []}, loaded = {}, askingPw = false;
+
+async function api(path, opts = {}) {
+  const o = {method: opts.method || 'GET', headers: {'X-Token': T}};
+  if (opts.json !== undefined) { o.method = 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(opts.json); }
+  const r = await fetch(path, o);
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) { const e = new Error(d.error || ('HTTP ' + r.status)); e.code = d.code; throw e; }
+  return d;
+}
+function tq() { return ['alias', 'user', 'port', 'jump', 'identity', 'channel'].map(k => k + '=' + enc(target[k] || '')).join('&'); }
+function fmtSize(n) { if (n < 1024) return n + ' B'; const u = ['KB','MB','GB','TB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 3); return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i]; }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function msg(box, text, err) { box.replaceChildren(el('div', 'hint' + (err ? ' err' : ''), text)); }
+
+function askPassword(text) {
+  return new Promise(res => {
+    $('mMsg').textContent = text; $('mInput').value = ''; $('modal').style.display = 'flex';
+    setTimeout(() => $('mInput').focus(), 0);
+    const done = v => { $('modal').style.display = 'none'; $('mOk').onclick = $('mCancel').onclick = null; res(v); };
+    $('mOk').onclick = () => done($('mInput').value);
+    $('mCancel').onclick = () => done(null);
+    $('mInput').onkeydown = e => { if (e.key === 'Enter') done($('mInput').value); else if (e.key === 'Escape') done(null); };
+  });
+}
+// Lỗi mật khẩu -> hỏi 1 lần rồi thử lại; lỗi khác -> chuyển cho nơi gọi.
+async function call(path, retry) {
+  try { return await api(path); }
+  catch (e) {
+    if (e.code === 'auth' && !askingPw) {
+      askingPw = true;
+      try {
+        const pw = await askPassword(e.message + '\n' + target.label);
+        if (pw === null) throw e;
+        await api('/api/password', {json: {target, password: pw}});
+      } finally { askingPw = false; }
+      return api(path);
+    }
+    throw e;
+  }
+}
+
+// ---------- Tài nguyên (tự cập nhật thưa khi tab đang mở)
+const label = {cpu: 'CPU', mem: 'RAM'};
+function metric(name, pct, text, tip) {
+  const m = el('div', 'm ' + (pct >= 90 ? 'hi' : pct >= 75 ? 'mid' : '')); m.title = tip || text;
+  const i = el('i'), u = el('u'); u.style.width = Math.min(100, Math.max(0, pct)) + '%'; i.appendChild(u);
+  m.append(el('b', '', name), i, el('span', 'v', text));
+  return m;
+}
+function spark(vals) {
+  const NS = 'http://www.w3.org/2000/svg', s = document.createElementNS(NS, 'svg');
+  s.setAttribute('class', 'spark'); s.setAttribute('viewBox', '0 0 100 26'); s.setAttribute('preserveAspectRatio', 'none');
+  const p = document.createElementNS(NS, 'polyline');
+  p.setAttribute('points', vals.map((v, i) => (vals.length < 2 ? 0 : i * 100 / (HIST - 1)).toFixed(1) + ',' + (25 - Math.min(100, v) * 24 / 100).toFixed(1)).join(' '));
+  s.appendChild(p); return s;
+}
+const pc = x => Math.round(x) + '%';
+function renderUsage(d) {
+  const b = $('b-usage'); b.replaceChildren();
+  if (d.cpu !== null) { hist.cpu.push(d.cpu); hist.cpu = hist.cpu.slice(-HIST); }
+  if (d.mem) { hist.mem.push(d.mem.pct); hist.mem = hist.mem.slice(-HIST); }
+  if (d.cpu !== null) {
+    b.appendChild(metric('CPU', d.cpu, pc(d.cpu) + (d.cores ? ' của ' + d.cores + ' nhân' : ''), 'Trung bình giữa hai lần đo'));
+    if (hist.cpu.length > 1) b.appendChild(spark(hist.cpu));
+  } else if (d.cores) b.appendChild(el('div', 'hint', 'CPU: đang lấy mẫu… (' + d.cores + ' nhân)'));
+  if (d.load) b.appendChild(el('div', 'hint', 'Load ' + d.load.map(x => x.toFixed(2)).join(' · ') + ' (1/5/15 phút)'));
+  if (d.mem) {
+    b.appendChild(metric('RAM', d.mem.pct, pc(d.mem.pct) + ' · ' + fmtSize(d.mem.used) + ' / ' + fmtSize(d.mem.total)));
+    if (hist.mem.length > 1) b.appendChild(spark(hist.mem));
+  }
+  (d.disks || []).forEach(k => b.appendChild(metric(k.mount.length > 8 ? '…' + k.mount.slice(-7) : k.mount, k.pct, pc(k.pct) + ' · ' + fmtSize(k.used) + ' / ' + fmtSize(k.total), k.dev + ' → ' + k.mount)));
+  if (!b.children.length) msg(b, 'Server này không cung cấp /proc (không phải Linux) — chưa đọc được số liệu.');
+  const names = {cpu: 'CPU', mem: 'RAM', disk: 'Ổ đĩa', load: 'Load'};
+  $('alert').textContent = d.alerts.length ? '⚠ Quá tải: ' + d.alerts.map(a => names[a]).join(', ') : '';
+  $('alert').classList.toggle('on', d.alerts.length > 0);
+  $('uptag').textContent = d.alerts.length ? 'quá tải' : 'ổn'; $('uptag').className = 'pill' + (d.alerts.length ? ' warn' : '');
+}
+async function pollUsage() {
+  clearTimeout(usageTimer); usageTimer = null;
+  if (!active || !target) return;
+  const t = target;
+  try {
+    const d = await call('/api/stats?' + tq());
+    if (t === target) { renderUsage(d); if (d.cpu === null && d.mem) { usageTimer = setTimeout(pollUsage, 3000); return; } }
+  } catch (e) { if (t === target) msg($('b-usage'), 'Không đọc được: ' + e.message, true); }
+  if (active) usageTimer = setTimeout(pollUsage, USAGE_EVERY);
+}
+
+// ---------- Các mục nặng: chỉ tải khi mở / bấm ⟳
+const need = (d, box) => { if (!d.priv) box.appendChild(el('div', 'hint', 'Không có quyền root (hoặc sudo cần mật khẩu) — một số dữ liệu có thể thiếu.')); };
+const R = {
+  procs(d, box) {
+    const by = box.dataset.by || 'cpu';
+    const seg = el('div', 'seg');
+    [['cpu', 'Theo CPU'], ['rss', 'Theo RAM']].forEach(([k, t]) => { const bt = el('button', k === by ? 'on' : '', t); bt.onclick = () => { box.dataset.by = k; R.procs(d, box); }; seg.appendChild(bt); });
+    const tb = el('table'); tb.innerHTML = '<tr><th>Tên</th><th class="r">#</th><th class="r" title="Trung bình từ lúc tiến trình chạy">CPU</th><th class="r">RAM</th></tr>';
+    d.procs.slice().sort((a, b) => b[by] - a[by]).slice(0, 12).forEach(p => {
+      const tr = el('tr'); const n = el('td', 'n', p.name); n.title = p.name + '\nuser: ' + p.users.join(', ');
+      tr.append(n, el('td', 'r', p.count), el('td', 'r', p.cpu.toFixed(1) + '%'), el('td', 'r', fmtSize(p.rss)));
+      tb.appendChild(tr);
+    });
+    box.replaceChildren(seg, tb, el('div', 'hint', 'CPU = trung bình từ lúc tiến trình bắt đầu chạy; tiến trình cùng tên được gộp.'));
+  },
+  firewall(d, box) { /* ghép với cổng mở trong load() */ },
+  access(d, box) {
+    box.replaceChildren(); need(d, box);
+    const sec = (t, lines, bad) => {
+      box.appendChild(el('div', 'sub', t));
+      if (!lines.length) box.appendChild(el('div', 'hint', 'Không có dữ liệu'));
+      lines.forEach(l => box.appendChild(el('div', 'ev' + (bad ? ' bad' : ''), l)));
+    };
+    sec('Đang đăng nhập (' + d.who.length + ')', d.who);
+    sec('Đăng nhập gần đây', d.last);
+    sec('SSH: thành công / thất bại', d.ssh);
+    if (d.failed.length || d.priv) sec('Đăng nhập thất bại (lastb)', d.failed, true);
+  },
+  actions(d, box) {
+    box.replaceChildren(); need(d, box);
+    if (!d.actions.length) box.appendChild(el('div', 'hint', 'Chưa thấy lệnh sudo nào trong log.'));
+    d.actions.forEach(a => {
+      const e = el('div', 'ev'); e.appendChild(el('small', '', a.time + ' · ' + a.user + (a.as ? ' → ' + a.as : '')));
+      e.appendChild(document.createTextNode(a.cmd)); box.appendChild(e);
+    });
+  },
+};
+function portRows(ports) {
+  const tb = el('table'); tb.innerHTML = '<tr><th>Cổng</th><th>Tiến trình</th><th>Phạm vi</th></tr>';
+  ports.forEach(p => {
+    const tr = el('tr'); tr.title = p.addr;
+    const sc = el('td', '', p.local_only ? 'nội bộ' : 'public'); if (!p.local_only) sc.style.color = 'var(--err)';
+    tr.append(el('td', '', p.port + '/' + p.proto), el('td', 'n', p.proc || '—'), sc); tb.appendChild(tr);
+  });
+  return tb;
+}
+async function loadSection(name, force) {
+  const box = $('b-' + name), t = target;
+  if (!t) return;
+  if (loaded[name] && !force) return;
+  loaded[name] = true; msg(box, 'Đang tải…');
+  try {
+    if (name === 'firewall') {
+      const [f, p] = await Promise.all([call('/api/server/firewall?' + tq()), call('/api/server/ports?' + tq())]);
+      if (t !== target) return;
+      box.replaceChildren(); need(f, box);
+      box.appendChild(el('div', 'sub', f.kind === 'none' ? 'Firewall' : 'Firewall: ' + f.kind));
+      if (f.kind === 'none') box.appendChild(el('div', 'hint', 'Không thấy ufw / firewalld / nftables / iptables.'));
+      else box.appendChild(el('pre', '', f.text || '(không đọc được — cần quyền root)'));
+      box.appendChild(el('div', 'sub', 'Cổng đang lắng nghe (' + p.ports.length + ')'));
+      box.appendChild(portRows(p.ports));
+    } else {
+      const d = await call('/api/server/' + name + '?' + tq());
+      if (t === target) R[name](d, box);
+    }
+  } catch (e) { loaded[name] = false; if (t === target) msg(box, 'Lỗi: ' + e.message, true); }
+}
+
+// ---------- Ngữ cảnh (host của tab hiện tại) + bật/tắt theo tab đang hiện
+function setTarget(t, ch) {
+  target = t; channel = ch; loaded = {}; hist = {cpu: [], mem: []};
+  $('empty').hidden = !!t; $('sections').hidden = !t;
+  $('host').textContent = t ? t.label : 'Chưa có phiên SSH'; $('dot').classList.toggle('on', !!t);
+  ['usage', 'procs', 'firewall', 'access', 'actions'].forEach(n => $('b-' + n).replaceChildren());
+  if (t) { refresh(); }
+}
+function refresh(force) {
+  pollUsage();
+  ['procs', 'firewall', 'access', 'actions'].forEach(n => { if ($('s-' + n).open) loadSection(n, force); });
+}
+async function pollCtx() {
+  clearTimeout(ctxTimer); ctxTimer = null;
+  if (!active) return;
+  try {
+    const c = await api('/api/context');
+    if (JSON.stringify(c.target) !== JSON.stringify(target)) setTarget(c.target, c.channel);
+  } catch (_) {}
+  if (active) ctxTimer = setTimeout(pollCtx, CTX_EVERY);
+}
+function setActive(on) {
+  active = on;
+  clearTimeout(usageTimer); clearTimeout(ctxTimer);
+  if (on) { pollCtx(); if (target) pollUsage(); }
+}
+window.addEventListener('message', e => { if (e.data && e.data.xshellActive !== undefined) setActive(!!e.data.xshellActive); });
+document.addEventListener('visibilitychange', () => { if (window.parent === window) setActive(!document.hidden); });
+['procs', 'firewall', 'access', 'actions'].forEach(n => $('s-' + n).addEventListener('toggle', e => { if (e.target.open) loadSection(n); }));
+document.querySelectorAll('.rf').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); loadSection(b.dataset.r, true); });
+$('bAll').onclick = () => refresh(true);
+if (active) pollCtx();
+</script></body></html>

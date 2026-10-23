@@ -16,28 +16,35 @@ iframe{flex:1;width:100%;border:0;display:none;background:var(--bg)}
 iframe.on{display:block}
 </style></head>
 <body><div id="app">
- <div class="tabs"><button id="tSsh" data-m="ssh">Kênh SSH</button><button id="tFtp" data-m="ftp">Xftp</button></div>
+ <div class="tabs"><button id="tSsh" data-m="ssh">Kênh SSH</button><button id="tFtp" data-m="ftp">Xftp</button><button id="tSrv" data-m="srv">Server</button></div>
  <iframe id="fSsh" title="Kênh SSH"></iframe>
  <iframe id="fFtp" title="Xftp"></iframe>
+ <iframe id="fSrv" title="Server"></iframe>
 </div>
 <script>
 const T = new URLSearchParams(location.search).get('t') || '';
 const $ = id => document.getElementById(id);
-const frames = {ssh: $('fSsh'), ftp: $('fFtp')}, tabs = {ssh: $('tSsh'), ftp: $('tFtp')};
+const frames = {ssh: $('fSsh'), ftp: $('fFtp'), srv: $('fSrv')}, tabs = {ssh: $('tSsh'), ftp: $('tFtp'), srv: $('tSrv')};
 frames.ssh.src = '/sessions?where=window&t=' + encodeURIComponent(T);
 frames.ftp.src = '/files?t=' + encodeURIComponent(T);
 let mode = 'ssh';
-try { if (localStorage.getItem('xshell.mode') === 'ftp') mode = 'ftp'; } catch (e) {}
+try { const m = localStorage.getItem('xshell.mode'); if (m === 'ftp' || m === 'srv') mode = m; } catch (e) {}
+function tellSrv() { try { frames.srv.contentWindow.postMessage({xshellActive: mode === 'srv'}, '*'); } catch (e) {} }
 function setMode(m) {
   mode = m;
+  // tab Server chỉ nạp (và chỉ thăm dò server) khi đang mở
+  if (m === 'srv' && !frames.srv.src) frames.srv.src = '/server?t=' + encodeURIComponent(T);
+  tellSrv();
   for (const k in frames) { frames[k].classList.toggle('on', k === m); tabs[k].classList.toggle('on', k === m); }
   try { localStorage.setItem('xshell.mode', m); } catch (e) {}
 }
+frames.srv.addEventListener('load', tellSrv);
 for (const k in tabs) tabs[k].onclick = () => setMode(k);
-// ⌘1 / ⌘2 đổi tab
+// ⌘1 / ⌘2 / ⌘3 đổi tab
 document.addEventListener('keydown', e => {
   if (e.metaKey && e.key === '1') { e.preventDefault(); setMode('ssh'); }
   if (e.metaKey && e.key === '2') { e.preventDefault(); setMode('ftp'); }
+  if (e.metaKey && e.key === '3') { e.preventDefault(); setMode('srv'); }
 });
 window.xshellFocusSearch = () => {
   setMode('ssh');
