@@ -27,12 +27,13 @@ summary .rf{font-weight:400;color:var(--mut);padding:0 5px}
 .body{padding:2px 10px 10px}
 .hint{color:var(--mut);padding:2px 0}
 .hint.err{color:var(--err)}
-.m{display:flex;gap:6px;align-items:center;margin:3px 0;font-variant-numeric:tabular-nums}
-.m b{width:44px;flex:none;font-weight:500;color:var(--mut)}
-.m i{display:block;flex:1;min-width:24px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.m{margin:0 0 9px;font-variant-numeric:tabular-nums}
+.m .t{display:flex;justify-content:space-between;gap:8px;margin-bottom:3px}
+.m .t b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.m .t .v{color:var(--mut);flex:none}
+.m i{display:block;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
 .m u{display:block;height:100%;background:var(--ok);text-decoration:none}
 .m.mid u{background:var(--mid)}.m.hi u{background:var(--err)}.m.hi .v{color:var(--err);font-weight:600}
-.m .v{flex:none;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seg{display:flex;gap:2px;margin-bottom:6px}
 .seg button{border-color:var(--line);padding:1px 8px}.seg button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 table{border-collapse:collapse;width:100%}
@@ -120,22 +121,22 @@ async function call(path, retry) {
 // ---------- Tài nguyên (tự cập nhật thưa khi tab đang mở)
 const label = {cpu: 'CPU', mem: 'RAM'};
 function metric(name, pct, text, tip) {
-  const m = el('div', 'm ' + (pct >= 90 ? 'hi' : pct >= 75 ? 'mid' : '')); m.title = tip || text;
+  const m = el('div', 'm ' + (pct >= 90 ? 'hi' : pct >= 75 ? 'mid' : '')); m.title = tip || '';
+  const t = el('div', 't'); t.append(el('b', '', name), el('span', 'v', text));
   const i = el('i'), u = el('u'); u.style.width = Math.min(100, Math.max(0, pct)) + '%'; i.appendChild(u);
-  m.append(el('b', '', name), i, el('span', 'v', text));
+  m.append(t, i);
   return m;
 }
 const pc = x => Math.round(x) + '%';
 function renderUsage(d) {
   const b = $('b-usage'); b.replaceChildren();
   if (d.cpu !== null) {
-    b.appendChild(metric('CPU', d.cpu, pc(d.cpu) + (d.cores ? ' của ' + d.cores + ' nhân' : ''), 'Trung bình giữa hai lần đo'));
+    b.appendChild(metric('CPU' + (d.cores ? ' · ' + d.cores + ' nhân' : ''), d.cpu, pc(d.cpu) + (d.load ? ' · load ' + d.load[0].toFixed(2) : ''), 'Trung bình giữa hai lần đo\nLoad ' + (d.load ? d.load.join(' / ') : '') + ' (1/5/15 phút)'));
   } else if (d.cores) b.appendChild(el('div', 'hint', 'CPU: đang lấy mẫu… (' + d.cores + ' nhân)'));
-  if (d.load) b.appendChild(el('div', 'hint', 'Load ' + d.load.map(x => x.toFixed(2)).join(' · ') + ' (1/5/15 phút)'));
   if (d.mem) {
-    b.appendChild(metric('RAM', d.mem.pct, pc(d.mem.pct) + ' · ' + fmtSize(d.mem.used) + ' / ' + fmtSize(d.mem.total)));
+    b.appendChild(metric('RAM', d.mem.pct, fmtSize(d.mem.used) + ' / ' + fmtSize(d.mem.total) + ' · ' + pc(d.mem.pct)));
   }
-  (d.disks || []).forEach(k => b.appendChild(metric(k.mount.length > 8 ? '…' + k.mount.slice(-7) : k.mount, k.pct, pc(k.pct) + ' · ' + fmtSize(k.used) + ' / ' + fmtSize(k.total), k.dev + ' → ' + k.mount)));
+  (d.disks || []).forEach(k => b.appendChild(metric('Ổ ' + k.mount, k.pct, fmtSize(k.used) + ' / ' + fmtSize(k.total) + ' · ' + pc(k.pct), k.dev + ' → ' + k.mount)));
   if (!b.children.length) msg(b, 'Server này không cung cấp /proc (không phải Linux) — chưa đọc được số liệu.');
   const names = {cpu: 'CPU', mem: 'RAM', disk: 'Ổ đĩa', load: 'Load'};
   $('alert').textContent = d.alerts.length ? '⚠ Quá tải: ' + d.alerts.map(a => names[a]).join(', ') : '';
